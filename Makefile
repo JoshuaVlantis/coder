@@ -1231,6 +1231,7 @@ coderd/apidoc/.gen: \
 	$(wildcard enterprise/coderd/*.go) \
 	$(wildcard codersdk/*.go) \
 	$(wildcard enterprise/wsproxy/wsproxysdk/*.go) \
+	$(wildcard coderd/workspaceconnwatcher/*.go) \
 	$(DB_GEN_FILES) \
 	coderd/rbac/object_gen.go \
 	.swaggo \

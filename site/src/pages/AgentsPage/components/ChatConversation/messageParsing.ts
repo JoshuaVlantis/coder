@@ -146,7 +146,7 @@ export const parseMessageContent = (
 			case "reasoning": {
 				parsed.reasoning = appendText(parsed.reasoning, part.text);
 				parsed.blocks = appendTextBlock(parsed.blocks, "thinking", part.text, {
-					startedAt: part.started_at,
+					startedAt: part.created_at,
 					completedAt: part.completed_at,
 				});
 				break;

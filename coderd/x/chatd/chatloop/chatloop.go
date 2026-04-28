@@ -921,13 +921,13 @@ func processStepStream(
 				activeReasoningContent[part.ID] = active
 			}
 			reasoningSSE := codersdk.ChatMessageReasoning(part.Delta)
-			// StartedAt on per-delta SSE messages lets the UI
-			// surface a live duration counter while the model is
-			// thinking. The persisted reasoning part still carries
-			// the canonical timestamps applied during persistence.
+			// CreatedAt on per-delta SSE messages lets the UI surface
+			// a live duration counter while the model is thinking. The
+			// persisted reasoning part still carries the canonical
+			// timestamp applied during persistence.
 			if exists && !active.startedAt.IsZero() {
 				startedAt := active.startedAt
-				reasoningSSE.StartedAt = &startedAt
+				reasoningSSE.CreatedAt = &startedAt
 			}
 			publishMessagePart(codersdk.ChatMessageRoleAssistant, reasoningSSE)
 
@@ -958,7 +958,7 @@ func processStepStream(
 					startedAt := active.startedAt
 					publishMessagePart(codersdk.ChatMessageRoleAssistant, codersdk.ChatMessagePart{
 						Type:        codersdk.ChatMessagePartTypeReasoning,
-						StartedAt:   &startedAt,
+						CreatedAt:   &startedAt,
 						CompletedAt: &completedAt,
 					})
 				}

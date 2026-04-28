@@ -220,7 +220,7 @@ describe("parseMessageContent", () => {
 			{
 				type: "reasoning",
 				text: "Pondering...",
-				started_at: "2026-04-21T00:00:00.000Z",
+				created_at: "2026-04-21T00:00:00.000Z",
 				completed_at: "2026-04-21T00:00:03.000Z",
 			},
 		]);
@@ -242,13 +242,13 @@ describe("parseMessageContent", () => {
 			{
 				type: "reasoning",
 				text: "First...",
-				started_at: "2026-04-21T00:00:00.000Z",
+				created_at: "2026-04-21T00:00:00.000Z",
 				completed_at: "2026-04-21T00:00:02.000Z",
 			},
 			{
 				type: "reasoning",
 				text: "Second.",
-				started_at: "2026-04-21T00:00:03.000Z",
+				created_at: "2026-04-21T00:00:03.000Z",
 				completed_at: "2026-04-21T00:00:05.000Z",
 			},
 		]);

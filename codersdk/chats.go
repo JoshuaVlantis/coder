@@ -234,15 +234,12 @@ type ChatMessagePart struct {
 	// the provider (e.g. Anthropic computer use).
 	ProviderExecuted bool `json:"provider_executed,omitempty" variants:"tool-call?,tool-result?"`
 	// CreatedAt records when this part was produced. Present on
-	// tool-call and tool-result parts so the frontend can compute
-	// tool execution duration.
-	CreatedAt *time.Time `json:"created_at,omitempty" format:"date-time" variants:"tool-call?,tool-result?"`
-	// StartedAt records when reasoning began streaming. Present on
-	// reasoning parts. Pair with CompletedAt to render reasoning
-	// duration.
-	StartedAt *time.Time `json:"started_at,omitempty" format:"date-time" variants:"reasoning?"`
+	// tool-call, tool-result, and reasoning parts. Tool duration is
+	// computed as result.CreatedAt - call.CreatedAt. Reasoning
+	// duration is computed as CompletedAt - CreatedAt.
+	CreatedAt *time.Time `json:"created_at,omitempty" format:"date-time" variants:"tool-call?,tool-result?,reasoning?"`
 	// CompletedAt records when reasoning finished streaming. May be
-	// absent on partial/interrupted reasoning even when StartedAt is
+	// absent on partial/interrupted reasoning even when CreatedAt is
 	// present.
 	CompletedAt *time.Time `json:"completed_at,omitempty" format:"date-time" variants:"reasoning?"`
 	// ContextFilePath is the absolute path of a file loaded into

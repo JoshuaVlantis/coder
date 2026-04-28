@@ -35,14 +35,14 @@ export const applyMessagePartToStreamState = (
 		case "reasoning": {
 			const hasText = Boolean(part.text?.trim());
 			const hasTimestamps =
-				part.started_at !== undefined || part.completed_at !== undefined;
+				part.created_at !== undefined || part.completed_at !== undefined;
 			if (!hasText && !hasTimestamps) {
 				return prev;
 			}
 			return {
 				...nextState,
 				blocks: appendTextBlock(nextState.blocks, "thinking", part.text ?? "", {
-					startedAt: part.started_at,
+					startedAt: part.created_at,
 					completedAt: part.completed_at,
 				}),
 			};

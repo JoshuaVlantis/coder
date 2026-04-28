@@ -23,7 +23,7 @@ func buildAssistantPartsForPersist(
 ) []codersdk.ChatMessagePart {
 	parts := make([]codersdk.ChatMessagePart, 0, len(assistantBlocks)+len(toolResults))
 	// reasoningIdx walks reasoning blocks in occurrence order so we
-	// can apply the matching StartedAt/CompletedAt timestamps from
+	// can apply the matching CreatedAt/CompletedAt timestamps from
 	// the parallel slices in step.
 	reasoningIdx := 0
 	for _, block := range assistantBlocks {
@@ -46,7 +46,7 @@ func buildAssistantPartsForPersist(
 		if part.Type == codersdk.ChatMessagePartTypeReasoning {
 			if reasoningIdx < len(step.ReasoningStartedAt) {
 				if ts := step.ReasoningStartedAt[reasoningIdx]; !ts.IsZero() {
-					part.StartedAt = &ts
+					part.CreatedAt = &ts
 				}
 			}
 			if reasoningIdx < len(step.ReasoningCompletedAt) {

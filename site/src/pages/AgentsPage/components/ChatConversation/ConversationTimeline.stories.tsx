@@ -1697,7 +1697,7 @@ export const ThinkingBlockWithDuration: Story = {
 					{
 						type: "reasoning",
 						text: "Considering the trade-offs.",
-						started_at: "2026-04-21T00:00:00.000Z",
+						created_at: "2026-04-21T00:00:00.000Z",
 						completed_at: "2026-04-21T00:00:12.000Z",
 					},
 					{

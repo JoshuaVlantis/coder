@@ -92,7 +92,7 @@ describe("applyMessagePartToStreamState", () => {
 		const result = applyMessagePartToStreamState(null, {
 			type: "reasoning",
 			text: "thinking…",
-			started_at: "2026-04-21T00:00:00.000Z",
+			created_at: "2026-04-21T00:00:00.000Z",
 			completed_at: "2026-04-21T00:00:01.500Z",
 		});
 		expect(result).not.toBeNull();
@@ -114,12 +114,12 @@ describe("applyMessagePartToStreamState", () => {
 		state = applyMessagePartToStreamState(state, {
 			type: "reasoning",
 			text: "thinking…",
-			started_at: "2026-04-21T00:00:00.000Z",
+			created_at: "2026-04-21T00:00:00.000Z",
 		});
 		state = applyMessagePartToStreamState(state, {
 			type: "reasoning",
 			text: "",
-			started_at: "2026-04-21T00:00:00.000Z",
+			created_at: "2026-04-21T00:00:00.000Z",
 			completed_at: "2026-04-21T00:00:02.000Z",
 		});
 		expect(state).not.toBeNull();

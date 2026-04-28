@@ -375,20 +375,20 @@ func TestChatMessagePart_ReasoningTimestamps_JSON(t *testing.T) {
 		part := codersdk.ChatMessagePart{
 			Type:        codersdk.ChatMessagePartTypeReasoning,
 			Text:        "thinking out loud",
-			StartedAt:   &startedAt,
+			CreatedAt:   &startedAt,
 			CompletedAt: &completedAt,
 		}
 		data, err := json.Marshal(part)
 		require.NoError(t, err)
-		require.Contains(t, string(data), `"started_at"`)
+		require.Contains(t, string(data), `"created_at"`)
 		require.Contains(t, string(data), `"completed_at"`)
 
 		var decoded codersdk.ChatMessagePart
 		err = json.Unmarshal(data, &decoded)
 		require.NoError(t, err)
-		require.NotNil(t, decoded.StartedAt)
+		require.NotNil(t, decoded.CreatedAt)
 		require.NotNil(t, decoded.CompletedAt)
-		require.True(t, startedAt.Equal(*decoded.StartedAt))
+		require.True(t, startedAt.Equal(*decoded.CreatedAt))
 		require.True(t, completedAt.Equal(*decoded.CompletedAt))
 	})
 
@@ -400,29 +400,29 @@ func TestChatMessagePart_ReasoningTimestamps_JSON(t *testing.T) {
 		}
 		data, err := json.Marshal(part)
 		require.NoError(t, err)
-		require.NotContains(t, string(data), `"started_at"`)
+		require.NotContains(t, string(data), `"created_at"`)
 		require.NotContains(t, string(data), `"completed_at"`)
 	})
 
 	t.Run("PartialInterrupted", func(t *testing.T) {
 		t.Parallel()
-		// Reasoning interrupted mid-stream may have StartedAt with no
+		// Reasoning interrupted mid-stream may have CreatedAt with no
 		// CompletedAt.
 		startedAt := time.Date(2025, 6, 15, 12, 30, 0, 0, time.UTC)
 		part := codersdk.ChatMessagePart{
 			Type:      codersdk.ChatMessagePartTypeReasoning,
 			Text:      "interrupted thinking",
-			StartedAt: &startedAt,
+			CreatedAt: &startedAt,
 		}
 		data, err := json.Marshal(part)
 		require.NoError(t, err)
-		require.Contains(t, string(data), `"started_at"`)
+		require.Contains(t, string(data), `"created_at"`)
 		require.NotContains(t, string(data), `"completed_at"`)
 
 		var decoded codersdk.ChatMessagePart
 		err = json.Unmarshal(data, &decoded)
 		require.NoError(t, err)
-		require.NotNil(t, decoded.StartedAt)
+		require.NotNil(t, decoded.CreatedAt)
 		require.Nil(t, decoded.CompletedAt)
 	})
 }

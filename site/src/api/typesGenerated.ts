@@ -2187,14 +2187,15 @@ export interface ChatReasoningPart {
 	readonly type: "reasoning";
 	readonly text: string;
 	/**
-	 * StartedAt records when reasoning began streaming. Present on
-	 * reasoning parts. Pair with CompletedAt to render reasoning
-	 * duration.
+	 * CreatedAt records when this part was produced. Present on
+	 * tool-call, tool-result, and reasoning parts. Tool duration is
+	 * computed as result.CreatedAt - call.CreatedAt. Reasoning
+	 * duration is computed as CompletedAt - CreatedAt.
 	 */
-	readonly started_at?: string;
+	readonly created_at?: string;
 	/**
 	 * CompletedAt records when reasoning finished streaming. May be
-	 * absent on partial/interrupted reasoning even when StartedAt is
+	 * absent on partial/interrupted reasoning even when CreatedAt is
 	 * present.
 	 */
 	readonly completed_at?: string;
@@ -2433,8 +2434,9 @@ export interface ChatToolCallPart {
 	readonly provider_executed?: boolean;
 	/**
 	 * CreatedAt records when this part was produced. Present on
-	 * tool-call and tool-result parts so the frontend can compute
-	 * tool execution duration.
+	 * tool-call, tool-result, and reasoning parts. Tool duration is
+	 * computed as result.CreatedAt - call.CreatedAt. Reasoning
+	 * duration is computed as CompletedAt - CreatedAt.
 	 */
 	readonly created_at?: string;
 }
@@ -2455,8 +2457,9 @@ export interface ChatToolResultPart {
 	readonly provider_executed?: boolean;
 	/**
 	 * CreatedAt records when this part was produced. Present on
-	 * tool-call and tool-result parts so the frontend can compute
-	 * tool execution duration.
+	 * tool-call, tool-result, and reasoning parts. Tool duration is
+	 * computed as result.CreatedAt - call.CreatedAt. Reasoning
+	 * duration is computed as CompletedAt - CreatedAt.
 	 */
 	readonly created_at?: string;
 }

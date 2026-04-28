@@ -914,22 +914,12 @@ func processStepStream(
 			}
 
 		case fantasy.StreamPartTypeReasoningDelta:
-			active, exists := activeReasoningContent[part.ID]
-			if exists {
+			if active, exists := activeReasoningContent[part.ID]; exists {
 				active.text += part.Delta
 				active.options = part.ProviderMetadata
 				activeReasoningContent[part.ID] = active
 			}
-			reasoningSSE := codersdk.ChatMessageReasoning(part.Delta)
-			// CreatedAt on per-delta SSE messages lets the UI surface
-			// a live duration counter while the model is thinking. The
-			// persisted reasoning part still carries the canonical
-			// timestamp applied during persistence.
-			if exists && !active.startedAt.IsZero() {
-				startedAt := active.startedAt
-				reasoningSSE.CreatedAt = &startedAt
-			}
-			publishMessagePart(codersdk.ChatMessageRoleAssistant, reasoningSSE)
+			publishMessagePart(codersdk.ChatMessageRoleAssistant, codersdk.ChatMessageReasoning(part.Delta))
 
 		case fantasy.StreamPartTypeReasoningEnd:
 			if active, exists := activeReasoningContent[part.ID]; exists {
@@ -941,27 +931,12 @@ func processStepStream(
 					ProviderMetadata: active.options,
 				}
 				result.content = append(result.content, content)
-				// Record start/end timestamps in occurrence order
-				// so the persistence layer can stamp the matching
+				// Record start/end timestamps in occurrence order so
+				// the persistence layer can stamp the matching
 				// reasoning ChatMessagePart by index.
-				completedAt := dbtime.Now()
 				result.reasoningStartedAt = append(result.reasoningStartedAt, active.startedAt)
-				result.reasoningCompletedAt = append(result.reasoningCompletedAt, completedAt)
+				result.reasoningCompletedAt = append(result.reasoningCompletedAt, dbtime.Now())
 				delete(activeReasoningContent, part.ID)
-
-				// Publish a final reasoning marker carrying both
-				// timestamps and an empty text. SSE consumers use
-				// this to lock in the final duration. Empty text
-				// avoids double-rendering content already streamed
-				// via reasoning deltas.
-				if !active.startedAt.IsZero() {
-					startedAt := active.startedAt
-					publishMessagePart(codersdk.ChatMessageRoleAssistant, codersdk.ChatMessagePart{
-						Type:        codersdk.ChatMessagePartTypeReasoning,
-						CreatedAt:   &startedAt,
-						CompletedAt: &completedAt,
-					})
-				}
 			}
 		case fantasy.StreamPartTypeToolInputStart:
 			activeToolCalls[part.ID] = &fantasy.ToolCallContent{

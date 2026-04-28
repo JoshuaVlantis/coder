@@ -97,6 +97,15 @@ type PersistedStep struct {
 	// Applied by the persistence layer to set CreatedAt
 	// on persisted tool-result ChatMessageParts.
 	ToolResultCreatedAt map[string]time.Time
+	// ReasoningStartedAt and ReasoningCompletedAt are parallel
+	// slices indexed by the occurrence order of reasoning
+	// content in Content. The persistence layer walks reasoning
+	// parts in order and applies these timestamps to the
+	// corresponding ChatMessageParts so the frontend can render
+	// reasoning duration. Reasoning parts have no provider-side
+	// stable ID, so order is the only correlation we have.
+	ReasoningStartedAt   []time.Time
+	ReasoningCompletedAt []time.Time
 }
 
 // RunOptions configures a single streaming chat loop run.
@@ -204,6 +213,13 @@ type stepResult struct {
 	shouldContinue      bool
 	toolCallCreatedAt   map[string]time.Time
 	toolResultCreatedAt map[string]time.Time
+	// reasoningStartedAt and reasoningCompletedAt are parallel
+	// slices indexed by the occurrence order of reasoning
+	// content in result.content. They are passed through
+	// PersistedStep so the persistence layer can stamp
+	// reasoning ChatMessageParts.
+	reasoningStartedAt   []time.Time
+	reasoningCompletedAt []time.Time
 }
 
 // toResponseMessages converts step content into messages suitable
@@ -305,8 +321,9 @@ func (r stepResult) toResponseMessages() []fantasy.Message {
 // reasoningState accumulates reasoning content and provider
 // metadata while the stream is in flight.
 type reasoningState struct {
-	text    string
-	options fantasy.ProviderMetadata
+	text      string
+	options   fantasy.ProviderMetadata
+	startedAt time.Time
 }
 
 // Run executes the chat step-stream loop and delegates
@@ -549,6 +566,10 @@ func Run(ctx context.Context, opts RunOptions) error {
 						ProviderResponseID:      extractOpenAIResponseIDIfStored(opts.ProviderOptions, result.providerMetadata),
 						Runtime:                 time.Since(stepStart),
 						PendingDynamicToolCalls: pending,
+						ToolCallCreatedAt:       result.toolCallCreatedAt,
+						ToolResultCreatedAt:     result.toolResultCreatedAt,
+						ReasoningStartedAt:      result.reasoningStartedAt,
+						ReasoningCompletedAt:    result.reasoningCompletedAt,
 					}); err != nil {
 						if errors.Is(err, ErrInterrupted) {
 							persistInterruptedStep(ctx, opts, &result)
@@ -596,13 +617,15 @@ func Run(ctx context.Context, opts RunOptions) error {
 			// check and here, fall back to the interrupt-safe
 			// path so partial content is not lost.
 			if err := opts.PersistStep(ctx, PersistedStep{
-				Content:             result.content,
-				Usage:               result.usage,
-				ContextLimit:        contextLimit,
-				ProviderResponseID:  extractOpenAIResponseIDIfStored(opts.ProviderOptions, result.providerMetadata),
-				Runtime:             time.Since(stepStart),
-				ToolCallCreatedAt:   result.toolCallCreatedAt,
-				ToolResultCreatedAt: result.toolResultCreatedAt,
+				Content:              result.content,
+				Usage:                result.usage,
+				ContextLimit:         contextLimit,
+				ProviderResponseID:   extractOpenAIResponseIDIfStored(opts.ProviderOptions, result.providerMetadata),
+				Runtime:              time.Since(stepStart),
+				ToolCallCreatedAt:    result.toolCallCreatedAt,
+				ToolResultCreatedAt:  result.toolResultCreatedAt,
+				ReasoningStartedAt:   result.reasoningStartedAt,
+				ReasoningCompletedAt: result.reasoningCompletedAt,
 			}); err != nil {
 				if errors.Is(err, ErrInterrupted) {
 					persistInterruptedStep(ctx, opts, &result)
@@ -885,17 +908,28 @@ func processStepStream(
 
 		case fantasy.StreamPartTypeReasoningStart:
 			activeReasoningContent[part.ID] = reasoningState{
-				text:    part.Delta,
-				options: part.ProviderMetadata,
+				text:      part.Delta,
+				options:   part.ProviderMetadata,
+				startedAt: dbtime.Now(),
 			}
 
 		case fantasy.StreamPartTypeReasoningDelta:
-			if active, exists := activeReasoningContent[part.ID]; exists {
+			active, exists := activeReasoningContent[part.ID]
+			if exists {
 				active.text += part.Delta
 				active.options = part.ProviderMetadata
 				activeReasoningContent[part.ID] = active
 			}
-			publishMessagePart(codersdk.ChatMessageRoleAssistant, codersdk.ChatMessageReasoning(part.Delta))
+			reasoningSSE := codersdk.ChatMessageReasoning(part.Delta)
+			// StartedAt on per-delta SSE messages lets the UI
+			// surface a live duration counter while the model is
+			// thinking. The persisted reasoning part still carries
+			// the canonical timestamps applied during persistence.
+			if exists && !active.startedAt.IsZero() {
+				startedAt := active.startedAt
+				reasoningSSE.StartedAt = &startedAt
+			}
+			publishMessagePart(codersdk.ChatMessageRoleAssistant, reasoningSSE)
 
 		case fantasy.StreamPartTypeReasoningEnd:
 			if active, exists := activeReasoningContent[part.ID]; exists {
@@ -907,7 +941,27 @@ func processStepStream(
 					ProviderMetadata: active.options,
 				}
 				result.content = append(result.content, content)
+				// Record start/end timestamps in occurrence order
+				// so the persistence layer can stamp the matching
+				// reasoning ChatMessagePart by index.
+				completedAt := dbtime.Now()
+				result.reasoningStartedAt = append(result.reasoningStartedAt, active.startedAt)
+				result.reasoningCompletedAt = append(result.reasoningCompletedAt, completedAt)
 				delete(activeReasoningContent, part.ID)
+
+				// Publish a final reasoning marker carrying both
+				// timestamps and an empty text. SSE consumers use
+				// this to lock in the final duration. Empty text
+				// avoids double-rendering content already streamed
+				// via reasoning deltas.
+				if !active.startedAt.IsZero() {
+					startedAt := active.startedAt
+					publishMessagePart(codersdk.ChatMessageRoleAssistant, codersdk.ChatMessagePart{
+						Type:        codersdk.ChatMessagePartTypeReasoning,
+						StartedAt:   &startedAt,
+						CompletedAt: &completedAt,
+					})
+				}
 			}
 		case fantasy.StreamPartTypeToolInputStart:
 			activeToolCalls[part.ID] = &fantasy.ToolCallContent{
@@ -1269,13 +1323,19 @@ func flushActiveState(
 		}
 	}
 
-	// Flush partial reasoning content.
+	// Flush partial reasoning content. The matching
+	// completedAt is filled in here with the interruption
+	// time so partial reasoning shows the time spent before
+	// the interruption.
+	flushedAt := dbtime.Now()
 	for _, rs := range activeReasoning {
 		if rs.text != "" {
 			result.content = append(result.content, fantasy.ReasoningContent{
 				Text:             rs.text,
 				ProviderMetadata: rs.options,
 			})
+			result.reasoningStartedAt = append(result.reasoningStartedAt, rs.startedAt)
+			result.reasoningCompletedAt = append(result.reasoningCompletedAt, flushedAt)
 		}
 	}
 
@@ -1389,9 +1449,11 @@ func persistInterruptedStep(
 
 	persistCtx := context.WithoutCancel(ctx)
 	if err := opts.PersistStep(persistCtx, PersistedStep{
-		Content:             content,
-		ToolCallCreatedAt:   toolCallCreatedAt,
-		ToolResultCreatedAt: toolResultCreatedAt,
+		Content:              content,
+		ToolCallCreatedAt:    toolCallCreatedAt,
+		ToolResultCreatedAt:  toolResultCreatedAt,
+		ReasoningStartedAt:   result.reasoningStartedAt,
+		ReasoningCompletedAt: result.reasoningCompletedAt,
 	}); err != nil {
 		if opts.OnInterruptedPersistError != nil {
 			opts.OnInterruptedPersistError(err)

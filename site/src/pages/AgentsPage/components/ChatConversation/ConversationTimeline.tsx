@@ -3,6 +3,7 @@ import {
 	type FC,
 	Fragment,
 	memo,
+	useEffect,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -38,6 +39,7 @@ import {
 } from "../ChatElements";
 import { WebSearchSources } from "../ChatElements/tools";
 import type { SubagentVariant } from "../ChatElements/tools/subagentDescriptor";
+import { shortDurationMs } from "../ChatElements/tools/utils";
 import { ImageLightbox } from "../ImageLightbox";
 import { TextPreviewDialog } from "../TextPreviewDialog";
 import {
@@ -73,12 +75,59 @@ const getChatMessageTextContent = (
 	return textContent.length > 0 ? textContent : undefined;
 };
 
+/**
+ * Compute a compact "Ns" label for the time spent reasoning. When
+ * the reasoning span is closed, the label is fixed. While streaming,
+ * the label increases each second so users see thinking-time grow
+ * live without needing to wait for the persisted message to arrive.
+ */
+const useReasoningDurationLabel = ({
+	startedAt,
+	completedAt,
+	isStreaming,
+}: {
+	startedAt?: string;
+	completedAt?: string;
+	isStreaming: boolean;
+}): string => {
+	const startedMs = startedAt ? new Date(startedAt).getTime() : Number.NaN;
+	const completedMs = completedAt
+		? new Date(completedAt).getTime()
+		: Number.NaN;
+
+	const showLive =
+		isStreaming && Number.isFinite(startedMs) && !Number.isFinite(completedMs);
+
+	const [now, setNow] = useState(() => Date.now());
+	useEffect(() => {
+		if (!showLive) {
+			return;
+		}
+		const tick = setInterval(() => setNow(Date.now()), 1000);
+		return () => clearInterval(tick);
+	}, [showLive]);
+
+	if (!Number.isFinite(startedMs)) {
+		return "";
+	}
+	const endMs = Number.isFinite(completedMs) ? completedMs : now;
+	const durationMs = endMs - startedMs;
+	if (durationMs < 0) {
+		return "";
+	}
+	return shortDurationMs(durationMs);
+};
+
 const ReasoningDisclosure = memo<{
 	id: string;
 	text: string;
 	isStreaming?: boolean;
 	urlTransform?: UrlTransform;
 	thinkingDisplayMode?: ThinkingDisplayMode;
+	/** ISO 8601 timestamp the model started reasoning. */
+	startedAt?: string;
+	/** ISO 8601 timestamp the model finished reasoning. */
+	completedAt?: string;
 }>(
 	({
 		id,
@@ -86,6 +135,8 @@ const ReasoningDisclosure = memo<{
 		isStreaming = false,
 		urlTransform,
 		thinkingDisplayMode: mode = "auto",
+		startedAt,
+		completedAt,
 	}) => {
 		const [manualToggle, setManualToggle] = useState<boolean | null>(null);
 
@@ -116,6 +167,15 @@ const ReasoningDisclosure = memo<{
 		})();
 
 		const expanded = manualToggle ?? autoExpanded;
+
+		// Reasoning duration label. When completed, the
+		// duration is fixed (completedAt - startedAt). While
+		// streaming, tick a 1Hz timer so the label grows live.
+		const durationLabel = useReasoningDurationLabel({
+			startedAt,
+			completedAt,
+			isStreaming,
+		});
 
 		const isPreviewConstrained =
 			mode === "preview" && isStreaming && manualToggle === null;
@@ -165,6 +225,11 @@ const ReasoningDisclosure = memo<{
 						</Shimmer>
 					) : (
 						<span className="text-sm">Thinking</span>
+					)}
+					{durationLabel && (
+						<span className="text-xs text-content-secondary tabular-nums">
+							{durationLabel}
+						</span>
 					)}
 					<ChevronDownIcon
 						className={cn(
@@ -326,6 +391,8 @@ export const BlockList: FC<{
 								}
 								urlTransform={urlTransform}
 								thinkingDisplayMode={thinkingDisplayMode}
+								startedAt={block.startedAt}
+								completedAt={block.completedAt}
 							/>
 						);
 					case "file-reference":

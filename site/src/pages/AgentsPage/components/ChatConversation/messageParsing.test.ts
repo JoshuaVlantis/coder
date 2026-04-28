@@ -215,6 +215,53 @@ describe("parseMessageContent", () => {
 		]);
 	});
 
+	it("threads reasoning timestamps onto the thinking block", () => {
+		const result = parseMessageContent([
+			{
+				type: "reasoning",
+				text: "Pondering...",
+				started_at: "2026-04-21T00:00:00.000Z",
+				completed_at: "2026-04-21T00:00:03.000Z",
+			},
+		]);
+		expect(result.blocks).toEqual([
+			{
+				type: "thinking",
+				text: "Pondering...",
+				startedAt: "2026-04-21T00:00:00.000Z",
+				completedAt: "2026-04-21T00:00:03.000Z",
+			},
+		]);
+	});
+
+	it("merges consecutive reasoning parts and keeps the duration span", () => {
+		// Two persisted reasoning parts in a row should collapse
+		// into a single thinking block whose startedAt is the
+		// earliest of the two and completedAt is the latest.
+		const result = parseMessageContent([
+			{
+				type: "reasoning",
+				text: "First...",
+				started_at: "2026-04-21T00:00:00.000Z",
+				completed_at: "2026-04-21T00:00:02.000Z",
+			},
+			{
+				type: "reasoning",
+				text: "Second.",
+				started_at: "2026-04-21T00:00:03.000Z",
+				completed_at: "2026-04-21T00:00:05.000Z",
+			},
+		]);
+		expect(result.blocks).toEqual([
+			{
+				type: "thinking",
+				text: "First...Second.",
+				startedAt: "2026-04-21T00:00:00.000Z",
+				completedAt: "2026-04-21T00:00:05.000Z",
+			},
+		]);
+	});
+
 	it("parses a tool_use / tool-call block", () => {
 		const result = parseMessageContent([
 			{

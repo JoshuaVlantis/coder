@@ -2186,6 +2186,18 @@ export interface ChatQueuedMessage {
 export interface ChatReasoningPart {
 	readonly type: "reasoning";
 	readonly text: string;
+	/**
+	 * StartedAt records when reasoning began streaming. Present on
+	 * reasoning parts. Pair with CompletedAt to render reasoning
+	 * duration.
+	 */
+	readonly started_at?: string;
+	/**
+	 * CompletedAt records when reasoning finished streaming. May be
+	 * absent on partial/interrupted reasoning even when StartedAt is
+	 * present.
+	 */
+	readonly completed_at?: string;
 }
 
 // From codersdk/chats.go

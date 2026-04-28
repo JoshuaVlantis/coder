@@ -88,6 +88,51 @@ describe("applyMessagePartToStreamState", () => {
 		expect(result).toBeNull();
 	});
 
+	it("threads reasoning timestamps onto the streamed thinking block", () => {
+		const result = applyMessagePartToStreamState(null, {
+			type: "reasoning",
+			text: "thinking…",
+			started_at: "2026-04-21T00:00:00.000Z",
+			completed_at: "2026-04-21T00:00:01.500Z",
+		});
+		expect(result).not.toBeNull();
+		expect(result!.blocks).toEqual([
+			{
+				type: "thinking",
+				text: "thinking…",
+				startedAt: "2026-04-21T00:00:00.000Z",
+				completedAt: "2026-04-21T00:00:01.500Z",
+			},
+		]);
+	});
+
+	it("locks in completedAt from a reasoning end marker with empty text", () => {
+		// Mirrors the chatloop publishing a delta first (with only
+		// startedAt) followed by an end marker (with empty text and
+		// both timestamps).
+		let state: StreamState | null = null;
+		state = applyMessagePartToStreamState(state, {
+			type: "reasoning",
+			text: "thinking…",
+			started_at: "2026-04-21T00:00:00.000Z",
+		});
+		state = applyMessagePartToStreamState(state, {
+			type: "reasoning",
+			text: "",
+			started_at: "2026-04-21T00:00:00.000Z",
+			completed_at: "2026-04-21T00:00:02.000Z",
+		});
+		expect(state).not.toBeNull();
+		expect(state!.blocks).toEqual([
+			{
+				type: "thinking",
+				text: "thinking…",
+				startedAt: "2026-04-21T00:00:00.000Z",
+				completedAt: "2026-04-21T00:00:02.000Z",
+			},
+		]);
+	});
+
 	it("creates tool call entry from tool-call part", () => {
 		const result = applyMessagePartToStreamState(null, {
 			type: "tool-call",

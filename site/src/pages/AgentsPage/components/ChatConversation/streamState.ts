@@ -33,12 +33,18 @@ export const applyMessagePartToStreamState = (
 			};
 		}
 		case "reasoning": {
-			if (!part.text?.trim()) {
+			const hasText = Boolean(part.text?.trim());
+			const hasTimestamps =
+				part.started_at !== undefined || part.completed_at !== undefined;
+			if (!hasText && !hasTimestamps) {
 				return prev;
 			}
 			return {
 				...nextState,
-				blocks: appendTextBlock(nextState.blocks, "thinking", part.text),
+				blocks: appendTextBlock(nextState.blocks, "thinking", part.text ?? "", {
+					startedAt: part.started_at,
+					completedAt: part.completed_at,
+				}),
 			};
 		}
 		case "tool-call": {

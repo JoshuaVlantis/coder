@@ -1671,6 +1671,52 @@ export const AssistantActionBarAfterHiddenMessages: Story = {
 };
 
 /**
+ * A completed thinking block with both reasoning timestamps shows
+ * a compact duration label next to the "Thinking" trigger.
+ */
+export const ThinkingBlockWithDuration: Story = {
+	parameters: {
+		queries: [
+			{
+				key: ["me", "preferences"],
+				data: {
+					task_notification_alert_dismissed: false,
+					thinking_display_mode: "auto" as const,
+				},
+			},
+		],
+	},
+	args: {
+		...defaultArgs,
+		parsedMessages: buildMessages([
+			{
+				...baseMessage,
+				id: 1,
+				role: "assistant",
+				content: [
+					{
+						type: "reasoning",
+						text: "Considering the trade-offs.",
+						started_at: "2026-04-21T00:00:00.000Z",
+						completed_at: "2026-04-21T00:00:12.000Z",
+					},
+					{
+						type: "text",
+						text: "Here is the answer.",
+					},
+				],
+			},
+		]),
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText("Thinking")).toBeInTheDocument();
+		// 12 seconds between start and end should render as "12s".
+		expect(canvas.getByText("12s")).toBeInTheDocument();
+	},
+};
+
+/**
  * A completed thinking block with always_expanded mode should show
  * its content without user interaction.
  */

@@ -38,6 +38,10 @@ export type RenderBlock =
 	| {
 			type: "thinking";
 			text: string;
+			/** ISO 8601 timestamp the model started reasoning. */
+			startedAt?: string;
+			/** ISO 8601 timestamp the model finished reasoning. */
+			completedAt?: string;
 	  }
 	| {
 			type: "tool";

@@ -237,6 +237,14 @@ type ChatMessagePart struct {
 	// tool-call and tool-result parts so the frontend can compute
 	// tool execution duration.
 	CreatedAt *time.Time `json:"created_at,omitempty" format:"date-time" variants:"tool-call?,tool-result?"`
+	// StartedAt records when reasoning began streaming. Present on
+	// reasoning parts. Pair with CompletedAt to render reasoning
+	// duration.
+	StartedAt *time.Time `json:"started_at,omitempty" format:"date-time" variants:"reasoning?"`
+	// CompletedAt records when reasoning finished streaming. May be
+	// absent on partial/interrupted reasoning even when StartedAt is
+	// present.
+	CompletedAt *time.Time `json:"completed_at,omitempty" format:"date-time" variants:"reasoning?"`
 	// ContextFilePath is the absolute path of a file loaded into
 	// the LLM context (e.g. an AGENTS.md instruction file).
 	ContextFilePath string `json:"context_file_path" variants:"context-file"`

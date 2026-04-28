@@ -1643,6 +1643,80 @@ func TestRun_ParallelToolExecutionTimestamps(t *testing.T) {
 		"tc-2 tool-result timestamp must be >= tool-call timestamp")
 }
 
+// TestRun_ReasoningTimestamps verifies that StreamPartTypeReasoningStart
+// and StreamPartTypeReasoningEnd produce parallel ReasoningStartedAt /
+// ReasoningCompletedAt slices on PersistedStep, in the same occurrence
+// order as the reasoning content blocks. The frontend computes
+// reasoning duration as completed_at - started_at.
+func TestRun_ReasoningTimestamps(t *testing.T) {
+	t.Parallel()
+
+	model := &chattest.FakeModel{
+		ProviderName: "fake",
+		StreamFn: func(_ context.Context, _ fantasy.Call) (fantasy.StreamResponse, error) {
+			return streamFromParts([]fantasy.StreamPart{
+				{Type: fantasy.StreamPartTypeReasoningStart, ID: "reason-1"},
+				{Type: fantasy.StreamPartTypeReasoningDelta, ID: "reason-1", Delta: "first thought"},
+				{Type: fantasy.StreamPartTypeReasoningEnd, ID: "reason-1"},
+				{Type: fantasy.StreamPartTypeReasoningStart, ID: "reason-2"},
+				{Type: fantasy.StreamPartTypeReasoningDelta, ID: "reason-2", Delta: "second thought"},
+				{Type: fantasy.StreamPartTypeReasoningEnd, ID: "reason-2"},
+				{Type: fantasy.StreamPartTypeTextStart, ID: "text-1"},
+				{Type: fantasy.StreamPartTypeTextDelta, ID: "text-1", Delta: "answer"},
+				{Type: fantasy.StreamPartTypeTextEnd, ID: "text-1"},
+				{Type: fantasy.StreamPartTypeFinish, FinishReason: fantasy.FinishReasonStop},
+			}), nil
+		},
+	}
+
+	var persistedSteps []PersistedStep
+	err := Run(context.Background(), RunOptions{
+		Model: model,
+		Messages: []fantasy.Message{
+			textMessage(fantasy.MessageRoleUser, "think"),
+		},
+		MaxSteps: 1,
+		PersistStep: func(_ context.Context, step PersistedStep) error {
+			persistedSteps = append(persistedSteps, step)
+			return nil
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, persistedSteps, 1)
+
+	step := persistedSteps[0]
+
+	// Both reasoning blocks must produce parallel timestamp entries.
+	require.Len(t, step.ReasoningStartedAt, 2,
+		"each StreamPartTypeReasoningEnd must record a started_at")
+	require.Len(t, step.ReasoningCompletedAt, 2,
+		"each StreamPartTypeReasoningEnd must record a completed_at")
+
+	// Timestamps must be monotonic per block (completed_at >= started_at).
+	for i := range step.ReasoningStartedAt {
+		require.False(t,
+			step.ReasoningCompletedAt[i].Before(step.ReasoningStartedAt[i]),
+			"completed_at[%d] must be >= started_at[%d]", i, i)
+	}
+
+	// Successive blocks must be ordered: reasoning-2 cannot start
+	// before reasoning-1 completes.
+	require.False(t,
+		step.ReasoningStartedAt[1].Before(step.ReasoningCompletedAt[0]),
+		"reasoning-2 started_at must be >= reasoning-1 completed_at")
+
+	// The reasoning content blocks must appear in the same order
+	// in step.Content so the persistence layer can correlate by
+	// occurrence order.
+	var reasoningOrder []string
+	for _, c := range step.Content {
+		if r, ok := fantasy.AsContentType[fantasy.ReasoningContent](c); ok {
+			reasoningOrder = append(reasoningOrder, r.Text)
+		}
+	}
+	require.Equal(t, []string{"first thought", "second thought"}, reasoningOrder)
+}
+
 func TestRun_PersistStepErrorPropagates(t *testing.T) {
 	t.Parallel()
 

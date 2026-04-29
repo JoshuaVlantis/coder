@@ -39,6 +39,8 @@ const (
 	connectionLogsBatchSize = 10000
 	// Batch size for audit log deletion.
 	auditLogsBatchSize = 10000
+	// Batch size for boundary log deletion.
+	boundaryLogsBatchSize = 10000
 	// Telemetry heartbeats are used to deduplicate events across replicas. We
 	// don't need to persist heartbeat rows for longer than 24 hours, as they
 	// are only used for deduplication across replicas. The time needs to be
@@ -304,6 +306,19 @@ func (i *instance) purgeTick(ctx context.Context, db database.Store, start time.
 			}
 		}
 
+		var purgedBoundaryLogs int64
+		boundaryLogsRetention := i.vals.Retention.BoundaryLogs.Value()
+		if boundaryLogsRetention > 0 {
+			deleteBoundaryLogsBefore := start.Add(-boundaryLogsRetention)
+			purgedBoundaryLogs, err = tx.DeleteOldBoundaryLogs(ctx, database.DeleteOldBoundaryLogsParams{
+				BeforeTime: deleteBoundaryLogsBefore,
+				LimitCount: boundaryLogsBatchSize,
+			})
+			if err != nil {
+				return xerrors.Errorf("failed to delete old boundary logs: %w", err)
+			}
+		}
+
 		var purgedChats, purgedChatFiles int64
 		if chatConfigErr == nil {
 			purgedChats, purgedChatFiles, archivedChats, err = i.purgeChatsInTx(ctx, tx, start, chatRetentionDays, chatAutoArchiveDays)
@@ -318,6 +333,7 @@ func (i *instance) purgeTick(ctx context.Context, db database.Store, start time.
 			slog.F("aibridge_records", purgedAIBridgeRecords),
 			slog.F("connection_logs", purgedConnectionLogs),
 			slog.F("audit_logs", purgedAuditLogs),
+			slog.F("boundary_logs", purgedBoundaryLogs),
 			slog.F("chats", purgedChats),
 			slog.F("chat_files", purgedChatFiles),
 			slog.F("auto_archived_chats", len(archivedChats)),
@@ -334,6 +350,7 @@ func (i *instance) purgeTick(ctx context.Context, db database.Store, start time.
 			i.recordsPurged.WithLabelValues("aibridge_records").Add(float64(purgedAIBridgeRecords))
 			i.recordsPurged.WithLabelValues("connection_logs").Add(float64(purgedConnectionLogs))
 			i.recordsPurged.WithLabelValues("audit_logs").Add(float64(purgedAuditLogs))
+			i.recordsPurged.WithLabelValues("boundary_logs").Add(float64(purgedBoundaryLogs))
 			i.recordsPurged.WithLabelValues("chats").Add(float64(purgedChats))
 			i.recordsPurged.WithLabelValues("chat_files").Add(float64(purgedChatFiles))
 		}

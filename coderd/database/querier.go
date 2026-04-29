@@ -146,6 +146,9 @@ type sqlcQuerier interface {
 	// connection events (connect, disconnect, open, close) which are handled
 	// separately by DeleteOldAuditLogConnectionEvents.
 	DeleteOldAuditLogs(ctx context.Context, arg DeleteOldAuditLogsParams) (int64, error)
+	// Deletes boundary logs older than the given time, bounded by a row limit
+	// to avoid long-running transactions.
+	DeleteOldBoundaryLogs(ctx context.Context, arg DeleteOldBoundaryLogsParams) (int64, error)
 	// TODO(cian): Add indexes on chats(archived, updated_at) and
 	// chat_files(created_at) for purge query performance.
 	// See: https://github.com/coder/internal/issues/1438
@@ -273,6 +276,8 @@ type sqlcQuerier interface {
 	// This function returns roles for authorization purposes. Implied member roles
 	// are included.
 	GetAuthorizationUserRoles(ctx context.Context, userID uuid.UUID) (GetAuthorizationUserRolesRow, error)
+	GetBoundaryLogByID(ctx context.Context, id uuid.UUID) (BoundaryLog, error)
+	GetBoundarySessionByID(ctx context.Context, id uuid.UUID) (BoundarySession, error)
 	// Auto-archive window in days. 0 disables.
 	GetChatAutoArchiveDays(ctx context.Context, defaultAutoArchiveDays int32) (int32, error)
 	GetChatByID(ctx context.Context, id uuid.UUID) (Chat, error)
@@ -808,6 +813,8 @@ type sqlcQuerier interface {
 	// every member of the org.
 	InsertAllUsersGroup(ctx context.Context, organizationID uuid.UUID) (Group, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) (AuditLog, error)
+	InsertBoundaryLog(ctx context.Context, arg InsertBoundaryLogParams) (BoundaryLog, error)
+	InsertBoundarySession(ctx context.Context, arg InsertBoundarySessionParams) (BoundarySession, error)
 	InsertChat(ctx context.Context, arg InsertChatParams) (Chat, error)
 	InsertChatDebugRun(ctx context.Context, arg InsertChatDebugRunParams) (ChatDebugRun, error)
 	// The CTE atomically locks the parent run via UPDATE, bumps its
@@ -930,6 +937,10 @@ type sqlcQuerier interface {
 	ListAIBridgeTokenUsagesByInterceptionIDs(ctx context.Context, interceptionIds []uuid.UUID) ([]AIBridgeTokenUsage, error)
 	ListAIBridgeToolUsagesByInterceptionIDs(ctx context.Context, interceptionIds []uuid.UUID) ([]AIBridgeToolUsage, error)
 	ListAIBridgeUserPromptsByInterceptionIDs(ctx context.Context, interceptionIds []uuid.UUID) ([]AIBridgeUserPrompt, error)
+	// Lists boundary logs for a session, sorted by sequence number ascending.
+	// Supports optional exclusive sequence number bounds (seq_after, seq_before)
+	// for fetching events between two known interceptions.
+	ListBoundaryLogsBySessionID(ctx context.Context, arg ListBoundaryLogsBySessionIDParams) ([]BoundaryLog, error)
 	ListChatUsageLimitGroupOverrides(ctx context.Context) ([]ListChatUsageLimitGroupOverridesRow, error)
 	ListChatUsageLimitOverrides(ctx context.Context) ([]ListChatUsageLimitOverridesRow, error)
 	ListProvisionerKeysByOrganization(ctx context.Context, organizationID uuid.UUID) ([]ProvisionerKey, error)

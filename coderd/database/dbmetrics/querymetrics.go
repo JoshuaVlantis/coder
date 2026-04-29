@@ -632,6 +632,14 @@ func (m queryMetricsStore) DeleteOldAuditLogs(ctx context.Context, arg database.
 	return r0, r1
 }
 
+func (m queryMetricsStore) DeleteOldBoundaryLogs(ctx context.Context, arg database.DeleteOldBoundaryLogsParams) (int64, error) {
+	start := time.Now()
+	r0, r1 := m.s.DeleteOldBoundaryLogs(ctx, arg)
+	m.queryLatencies.WithLabelValues("DeleteOldBoundaryLogs").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "DeleteOldBoundaryLogs").Inc()
+	return r0, r1
+}
+
 func (m queryMetricsStore) DeleteOldChatFiles(ctx context.Context, arg database.DeleteOldChatFilesParams) (int64, error) {
 	start := time.Now()
 	r0, r1 := m.s.DeleteOldChatFiles(ctx, arg)
@@ -1117,6 +1125,22 @@ func (m queryMetricsStore) GetAuthorizationUserRoles(ctx context.Context, userID
 	r0, r1 := m.s.GetAuthorizationUserRoles(ctx, userID)
 	m.queryLatencies.WithLabelValues("GetAuthorizationUserRoles").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetAuthorizationUserRoles").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) GetBoundaryLogByID(ctx context.Context, id uuid.UUID) (database.BoundaryLog, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetBoundaryLogByID(ctx, id)
+	m.queryLatencies.WithLabelValues("GetBoundaryLogByID").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetBoundaryLogByID").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) GetBoundarySessionByID(ctx context.Context, id uuid.UUID) (database.BoundarySession, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetBoundarySessionByID(ctx, id)
+	m.queryLatencies.WithLabelValues("GetBoundarySessionByID").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetBoundarySessionByID").Inc()
 	return r0, r1
 }
 
@@ -3472,6 +3496,22 @@ func (m queryMetricsStore) InsertAuditLog(ctx context.Context, arg database.Inse
 	return r0, r1
 }
 
+func (m queryMetricsStore) InsertBoundaryLog(ctx context.Context, arg database.InsertBoundaryLogParams) (database.BoundaryLog, error) {
+	start := time.Now()
+	r0, r1 := m.s.InsertBoundaryLog(ctx, arg)
+	m.queryLatencies.WithLabelValues("InsertBoundaryLog").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "InsertBoundaryLog").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) InsertBoundarySession(ctx context.Context, arg database.InsertBoundarySessionParams) (database.BoundarySession, error) {
+	start := time.Now()
+	r0, r1 := m.s.InsertBoundarySession(ctx, arg)
+	m.queryLatencies.WithLabelValues("InsertBoundarySession").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "InsertBoundarySession").Inc()
+	return r0, r1
+}
+
 func (m queryMetricsStore) InsertChat(ctx context.Context, arg database.InsertChatParams) (database.Chat, error) {
 	start := time.Now()
 	r0, r1 := m.s.InsertChat(ctx, arg)
@@ -4109,6 +4149,14 @@ func (m queryMetricsStore) ListAIBridgeUserPromptsByInterceptionIDs(ctx context.
 	r0, r1 := m.s.ListAIBridgeUserPromptsByInterceptionIDs(ctx, interceptionIds)
 	m.queryLatencies.WithLabelValues("ListAIBridgeUserPromptsByInterceptionIDs").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "ListAIBridgeUserPromptsByInterceptionIDs").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) ListBoundaryLogsBySessionID(ctx context.Context, arg database.ListBoundaryLogsBySessionIDParams) ([]database.BoundaryLog, error) {
+	start := time.Now()
+	r0, r1 := m.s.ListBoundaryLogsBySessionID(ctx, arg)
+	m.queryLatencies.WithLabelValues("ListBoundaryLogsBySessionID").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "ListBoundaryLogsBySessionID").Inc()
 	return r0, r1
 }
 

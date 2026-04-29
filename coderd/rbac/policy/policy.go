@@ -392,6 +392,13 @@ var RBACPermissions = map[string]PermissionDefinition{
 			ActionCreate: "create aibridge interceptions & related records",
 		},
 	},
+	"boundary_log": {
+		Actions: map[Action]ActionDefinition{
+			ActionCreate: "persist boundary audit logs reported by the workspace agent",
+			ActionRead:   "read boundary audit logs and session metadata",
+			ActionDelete: "delete boundary audit logs past the retention period",
+		},
+	},
 	"boundary_usage": {
 		Actions: map[Action]ActionDefinition{
 			ActionRead:   "read boundary usage statistics",

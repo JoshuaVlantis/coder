@@ -593,6 +593,59 @@ const docTemplate = `{
                 ]
             }
         },
+        "/boundary/sessions/{id}/logs": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Boundary"
+                ],
+                "summary": "Get boundary session logs",
+                "operationId": "get-boundary-session-logs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Boundary session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Exclusive lower bound on sequence number",
+                        "name": "seq_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Exclusive upper bound on sequence number",
+                        "name": "seq_before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of logs to return (default 100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/codersdk.BoundarySessionLogsResponse"
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ]
+            }
+        },
         "/buildinfo": {
             "get": {
                 "produces": [
@@ -14656,6 +14709,56 @@ const docTemplate = `{
                 },
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "codersdk.BoundaryLog": {
+            "type": "object",
+            "properties": {
+                "allowed": {
+                    "type": "boolean"
+                },
+                "captured_at": {
+                    "type": "string",
+                    "format": "date-time"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "matched_rule": {
+                    "type": "string"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "proto": {
+                    "type": "string"
+                },
+                "sequence_number": {
+                    "type": "integer"
+                },
+                "session_id": {
+                    "type": "string",
+                    "format": "uuid"
+                },
+                "time": {
+                    "type": "string",
+                    "format": "date-time"
+                }
+            }
+        },
+        "codersdk.BoundarySessionLogsResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/codersdk.BoundaryLog"
+                    }
                 }
             }
         },

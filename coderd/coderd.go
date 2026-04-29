@@ -1369,6 +1369,10 @@ func New(options *Options) *API {
 			r.Get("/", api.auditLogs)
 			r.Post("/testgenerate", api.generateFakeAuditLog)
 		})
+		r.Route("/boundary/sessions/{id}/logs", func(r chi.Router) {
+			r.Use(apiKeyMiddleware)
+			r.Get("/", api.boundarySessionLogs)
+		})
 		r.Route("/files", func(r chi.Router) {
 			r.Use(
 				apiKeyMiddleware,

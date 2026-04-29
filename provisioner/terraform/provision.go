@@ -279,6 +279,7 @@ func (s *server) Graph(
 		HasAiTasks:            state.HasAITasks,
 		AiTasks:               state.AITasks,
 		HasExternalAgents:     state.HasExternalAgents,
+		DlpPolicies:           state.DLPPolicies,
 	}
 }
 

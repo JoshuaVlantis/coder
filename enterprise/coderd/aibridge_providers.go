@@ -206,6 +206,8 @@ func (api *API) aiBridgeCreateProvider(rw http.ResponseWriter, r *http.Request) 
 	}
 	aReq.New = row
 
+	publishAIBridgeProvidersChanged(ctx, api.Pubsub, api.AGPL.Logger)
+
 	sdk, err := dbAIProviderToSDK(row)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -314,6 +316,8 @@ func (api *API) aiBridgeUpdateProvider(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	publishAIBridgeProvidersChanged(ctx, api.Pubsub, api.AGPL.Logger)
+
 	sdk, err := dbAIProviderToSDK(updated)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
@@ -372,6 +376,8 @@ func (api *API) aiBridgeDeleteProvider(rw http.ResponseWriter, r *http.Request) 
 		return
 	}
 	aReq.New = deleted
+
+	publishAIBridgeProvidersChanged(ctx, api.Pubsub, api.AGPL.Logger)
 
 	rw.WriteHeader(http.StatusNoContent)
 }

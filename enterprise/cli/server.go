@@ -15,9 +15,11 @@ import (
 	"tailscale.com/derp"
 	"tailscale.com/types/key"
 
+	"cdr.dev/slog/v3"
 	agplcoderd "github.com/coder/coder/v2/coderd"
 	"github.com/coder/coder/v2/coderd/database"
 	"github.com/coder/coder/v2/cryptorand"
+	"github.com/coder/coder/v2/enterprise/aibridged"
 	"github.com/coder/coder/v2/enterprise/audit"
 	"github.com/coder/coder/v2/enterprise/audit/backends"
 	"github.com/coder/coder/v2/enterprise/coderd"
@@ -180,9 +182,9 @@ func (r *RootCmd) Server(_ func()) *serpent.Command {
 				return nil, nil, xerrors.Errorf("seed ai providers from env: %w", err)
 			}
 
-			providers, err := buildProviders(options.DeploymentValues.AI.BridgeConfig)
+			providers, err := loadProvidersFromDB(ctx, options.Database, options.DeploymentValues.AI.BridgeConfig)
 			if err != nil {
-				return nil, nil, xerrors.Errorf("build aibridge providers: %w", err)
+				return nil, nil, xerrors.Errorf("load aibridge providers from db: %w", err)
 			}
 
 			// In-memory aibridge daemon.
@@ -190,8 +192,9 @@ func (r *RootCmd) Server(_ func()) *serpent.Command {
 			// probably better managed by the enterprise API type itself. Managing
 			// it in the API type means we can avoid starting it up when the license
 			// is not entitled to the feature.
+			var aibridgeDaemon *aibridged.Server
 			if bridgeEnabled {
-				aibridgeDaemon, err := newAIBridgeDaemon(api, providers)
+				aibridgeDaemon, err = newAIBridgeDaemon(api, providers)
 				if err != nil {
 					return nil, nil, xerrors.Errorf("create aibridged: %w", err)
 				}
@@ -217,6 +220,32 @@ func (r *RootCmd) Server(_ func()) *serpent.Command {
 
 				// Register the handler so coderd can serve the proxy endpoints.
 				api.RegisterInMemoryAIBridgeProxydHTTPHandler(aiBridgeProxyServer.Handler())
+			}
+
+			// Subscribe to ai_providers_changed pubsub events and
+			// reload the daemon's pool atomically. The proxy daemon
+			// is intentionally not reloaded yet; that comes in a
+			// follow-up that gives the proxy a Pooler interface too.
+			if aibridgeDaemon != nil {
+				watcherLogger := options.Logger.Named("aibridge.reload")
+				unsub, err := options.Pubsub.Subscribe(coderd.AIBridgeProvidersChangedChannel, func(notifyCtx context.Context, _ []byte) {
+					newProviders, err := loadProvidersFromDB(notifyCtx, options.Database, options.DeploymentValues.AI.BridgeConfig)
+					if err != nil {
+						watcherLogger.Warn(notifyCtx, "failed to reload ai bridge providers from db; keeping existing pool", slog.Error(err))
+						return
+					}
+					aibridgeDaemon.Reload(newProviders)
+				})
+				if err != nil {
+					watcherLogger.Warn(ctx, "failed to subscribe to ai_providers_changed; pool will not hot-reload", slog.Error(err))
+				} else {
+					closer := unsub
+					closer2 := closerFunc(func() error {
+						closer()
+						return nil
+					})
+					closers.Add(closer2)
+				}
 			}
 		}
 
@@ -248,3 +277,10 @@ func (m *multiCloser) Close() error {
 	}
 	return errors.Join(errs...)
 }
+
+// closerFunc adapts a func() error to io.Closer so we can register
+// teardown closures (e.g. pubsub unsubscribe functions) with the
+// shared multiCloser.
+type closerFunc func() error
+
+func (f closerFunc) Close() error { return f() }

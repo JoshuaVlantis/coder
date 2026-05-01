@@ -161,6 +161,153 @@
 				]
 			}
 		},
+		"/aibridge/providers": {
+			"get": {
+				"produces": ["application/json"],
+				"tags": ["AI Bridge"],
+				"summary": "List AI Bridge providers",
+				"operationId": "list-ai-bridge-providers",
+				"responses": {
+					"200": {
+						"description": "OK",
+						"schema": {
+							"type": "array",
+							"items": {
+								"$ref": "#/definitions/codersdk.AIProvider"
+							}
+						}
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			},
+			"post": {
+				"consumes": ["application/json"],
+				"produces": ["application/json"],
+				"tags": ["AI Bridge"],
+				"summary": "Create an AI Bridge provider",
+				"operationId": "create-an-ai-bridge-provider",
+				"parameters": [
+					{
+						"description": "Create AI provider request",
+						"name": "request",
+						"in": "body",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/codersdk.CreateAIProviderRequest"
+						}
+					}
+				],
+				"responses": {
+					"201": {
+						"description": "Created",
+						"schema": {
+							"$ref": "#/definitions/codersdk.AIProvider"
+						}
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			}
+		},
+		"/aibridge/providers/{idOrName}": {
+			"get": {
+				"produces": ["application/json"],
+				"tags": ["AI Bridge"],
+				"summary": "Get an AI Bridge provider",
+				"operationId": "get-an-ai-bridge-provider",
+				"parameters": [
+					{
+						"type": "string",
+						"description": "Provider ID or name",
+						"name": "idOrName",
+						"in": "path",
+						"required": true
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"schema": {
+							"$ref": "#/definitions/codersdk.AIProvider"
+						}
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			},
+			"delete": {
+				"tags": ["AI Bridge"],
+				"summary": "Delete an AI Bridge provider",
+				"operationId": "delete-an-ai-bridge-provider",
+				"parameters": [
+					{
+						"type": "string",
+						"description": "Provider ID or name",
+						"name": "idOrName",
+						"in": "path",
+						"required": true
+					}
+				],
+				"responses": {
+					"204": {
+						"description": "No Content"
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			},
+			"patch": {
+				"consumes": ["application/json"],
+				"produces": ["application/json"],
+				"tags": ["AI Bridge"],
+				"summary": "Update an AI Bridge provider",
+				"operationId": "update-an-ai-bridge-provider",
+				"parameters": [
+					{
+						"type": "string",
+						"description": "Provider ID or name",
+						"name": "idOrName",
+						"in": "path",
+						"required": true
+					},
+					{
+						"description": "Update AI provider request",
+						"name": "request",
+						"in": "body",
+						"required": true,
+						"schema": {
+							"$ref": "#/definitions/codersdk.UpdateAIProviderRequest"
+						}
+					}
+				],
+				"responses": {
+					"200": {
+						"description": "OK",
+						"schema": {
+							"$ref": "#/definitions/codersdk.AIProvider"
+						}
+					}
+				},
+				"security": [
+					{
+						"CoderSessionToken": []
+					}
+				]
+			}
+		},
 		"/aibridge/sessions": {
 			"get": {
 				"produces": ["application/json"],
@@ -12252,6 +12399,63 @@
 				}
 			}
 		},
+		"codersdk.AIProvider": {
+			"type": "object",
+			"properties": {
+				"base_url": {
+					"type": "string"
+				},
+				"created_at": {
+					"type": "string",
+					"format": "date-time"
+				},
+				"display_name": {
+					"type": "string"
+				},
+				"enabled": {
+					"type": "boolean"
+				},
+				"id": {
+					"type": "string",
+					"format": "uuid"
+				},
+				"name": {
+					"type": "string"
+				},
+				"settings": {
+					"$ref": "#/definitions/codersdk.AIProviderSettings"
+				},
+				"type": {
+					"$ref": "#/definitions/codersdk.AIProviderType"
+				},
+				"updated_at": {
+					"type": "string",
+					"format": "date-time"
+				}
+			}
+		},
+		"codersdk.AIProviderSettings": {
+			"type": "object",
+			"properties": {
+				"bedrock_model": {
+					"description": "BedrockModel is the AWS Bedrock model identifier used for\nprimary requests. Only meaningful when Type is\nAIProviderTypeAnthropic.",
+					"type": "string"
+				},
+				"bedrock_region": {
+					"description": "BedrockRegion is the AWS region used to construct the Bedrock\nendpoint URL when BaseURL is not set on the parent provider.\nOnly meaningful when Type is AIProviderTypeAnthropic.",
+					"type": "string"
+				},
+				"bedrock_small_fast_model": {
+					"description": "BedrockSmallFastModel is the AWS Bedrock model identifier used\nfor background tasks (e.g. Claude Code's haiku-class model).\nOnly meaningful when Type is AIProviderTypeAnthropic.",
+					"type": "string"
+				}
+			}
+		},
+		"codersdk.AIProviderType": {
+			"type": "string",
+			"enum": ["openai", "anthropic"],
+			"x-enum-varnames": ["AIProviderTypeOpenAI", "AIProviderTypeAnthropic"]
+		},
 		"codersdk.APIAllowListTarget": {
 			"type": "object",
 			"properties": {
@@ -13472,6 +13676,36 @@
 							"$ref": "#/definitions/codersdk.LoginType"
 						}
 					]
+				}
+			}
+		},
+		"codersdk.CreateAIProviderRequest": {
+			"type": "object",
+			"properties": {
+				"api_key": {
+					"type": "string"
+				},
+				"base_url": {
+					"type": "string"
+				},
+				"bedrock_access_key_secret": {
+					"description": "BedrockAccessKeySecret is the AWS secret access key paired with\nAPIKey (used as the access key) when configuring an Anthropic\nprovider that targets AWS Bedrock. Write-only.",
+					"type": "string"
+				},
+				"display_name": {
+					"type": "string"
+				},
+				"enabled": {
+					"type": "boolean"
+				},
+				"name": {
+					"type": "string"
+				},
+				"settings": {
+					"$ref": "#/definitions/codersdk.AIProviderSettings"
+				},
+				"type": {
+					"$ref": "#/definitions/codersdk.AIProviderType"
 				}
 			}
 		},
@@ -19616,6 +19850,29 @@
 				"p95": {
 					"type": "integer",
 					"example": 146
+				}
+			}
+		},
+		"codersdk.UpdateAIProviderRequest": {
+			"type": "object",
+			"properties": {
+				"api_key": {
+					"type": "string"
+				},
+				"base_url": {
+					"type": "string"
+				},
+				"bedrock_access_key_secret": {
+					"type": "string"
+				},
+				"display_name": {
+					"type": "string"
+				},
+				"enabled": {
+					"type": "boolean"
+				},
+				"settings": {
+					"$ref": "#/definitions/codersdk.AIProviderSettings"
 				}
 			}
 		},

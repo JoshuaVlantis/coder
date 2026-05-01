@@ -61,6 +61,11 @@ func aibridgeHandler(api *API, middlewares ...func(http.Handler) http.Handler) f
 			r.Get("/clients", api.aiBridgeListClients)
 		})
 
+		// AI Bridge provider configuration CRUD must be registered before
+		// the catch-all aibridged route below so /providers is not
+		// shadowed by the proxy.
+		r.Route("/providers", aiBridgeProvidersHandler(api, middlewares...))
+
 		// Apply overload protection middleware to the aibridged handler.
 		// Concurrency limit is checked first for faster rejection under load.
 		r.Group(func(r chi.Router) {

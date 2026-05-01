@@ -3178,6 +3178,30 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 | `relay_url`      | [serpent.URL](#serpenturl) | false    |              |             |
 | `stun_addresses` | array of string            | false    |              |             |
 
+## codersdk.DLPPolicy
+
+```json
+{
+  "allowed_applications": [
+    "string"
+  ],
+  "name": "string",
+  "port_forwarding_access": true,
+  "ssh_access": true,
+  "web_terminal_access": true
+}
+```
+
+### Properties
+
+| Name                     | Type            | Required | Restrictions | Description                                                                                                                                    |
+|--------------------------|-----------------|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
+| `allowed_applications`   | array of string | false    |              | Allowed applications lists the `coder_app` slugs the workspace user is permitted to access. Apps whose slugs are not in this list are blocked. |
+| `name`                   | string          | false    |              |                                                                                                                                                |
+| `port_forwarding_access` | boolean         | false    |              |                                                                                                                                                |
+| `ssh_access`             | boolean         | false    |              |                                                                                                                                                |
+| `web_terminal_access`    | boolean         | false    |              |                                                                                                                                                |
+
 ## codersdk.DangerousConfig
 
 ```json
@@ -7299,6 +7323,15 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
             "display_apps": [
               "vscode"
             ],
+            "dlp_policy": {
+              "allowed_applications": [
+                "string"
+              ],
+              "name": "string",
+              "port_forwarding_access": true,
+              "ssh_access": true,
+              "web_terminal_access": true
+            },
             "environment_variables": {
               "property1": "string",
               "property2": "string"
@@ -8651,6 +8684,15 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
             "display_apps": [
               "vscode"
             ],
+            "dlp_policy": {
+              "allowed_applications": [
+                "string"
+              ],
+              "name": "string",
+              "port_forwarding_access": true,
+              "ssh_access": true,
+              "web_terminal_access": true
+            },
             "environment_variables": {
               "property1": "string",
               "property2": "string"
@@ -11630,6 +11672,15 @@ If the schedule is empty, the user will be updated to use the default schedule.|
             "display_apps": [
               "vscode"
             ],
+            "dlp_policy": {
+              "allowed_applications": [
+                "string"
+              ],
+              "name": "string",
+              "port_forwarding_access": true,
+              "ssh_access": true,
+              "web_terminal_access": true
+            },
             "environment_variables": {
               "property1": "string",
               "property2": "string"
@@ -11915,6 +11966,15 @@ If the schedule is empty, the user will be updated to use the default schedule.|
   "display_apps": [
     "vscode"
   ],
+  "dlp_policy": {
+    "allowed_applications": [
+      "string"
+    ],
+    "name": "string",
+    "port_forwarding_access": true,
+    "ssh_access": true,
+    "web_terminal_access": true
+  },
   "environment_variables": {
     "property1": "string",
     "property2": "string"
@@ -11998,6 +12058,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 | `directory`                  | string                                                                                       | false    |              |                                                                                                                                                                              |
 | `disconnected_at`            | string                                                                                       | false    |              |                                                                                                                                                                              |
 | `display_apps`               | array of [codersdk.DisplayApp](#codersdkdisplayapp)                                          | false    |              |                                                                                                                                                                              |
+| `dlp_policy`                 | [codersdk.DLPPolicy](#codersdkdlppolicy)                                                     | false    |              | Dlp policy is the data loss prevention policy attached to this agent via `coder_agent.dlp_policy`. Nil when no policy is configured.                                         |
 | `environment_variables`      | object                                                                                       | false    |              |                                                                                                                                                                              |
 | » `[any property]`           | string                                                                                       | false    |              |                                                                                                                                                                              |
 | `expanded_directory`         | string                                                                                       | false    |              |                                                                                                                                                                              |
@@ -12811,6 +12872,15 @@ If the schedule is empty, the user will be updated to use the default schedule.|
           "display_apps": [
             "vscode"
           ],
+          "dlp_policy": {
+            "allowed_applications": [
+              "string"
+            ],
+            "name": "string",
+            "port_forwarding_access": true,
+            "ssh_access": true,
+            "web_terminal_access": true
+          },
           "environment_variables": {
             "property1": "string",
             "property2": "string"
@@ -13281,6 +13351,15 @@ If the schedule is empty, the user will be updated to use the default schedule.|
       "display_apps": [
         "vscode"
       ],
+      "dlp_policy": {
+        "allowed_applications": [
+          "string"
+        ],
+        "name": "string",
+        "port_forwarding_access": true,
+        "ssh_access": true,
+        "web_terminal_access": true
+      },
       "environment_variables": {
         "property1": "string",
         "property2": "string"
@@ -13631,6 +13710,15 @@ If the schedule is empty, the user will be updated to use the default schedule.|
                 "display_apps": [
                   "vscode"
                 ],
+                "dlp_policy": {
+                  "allowed_applications": [
+                    "string"
+                  ],
+                  "name": "string",
+                  "port_forwarding_access": true,
+                  "ssh_access": true,
+                  "web_terminal_access": true
+                },
                 "environment_variables": {
                   "property1": "string",
                   "property2": "string"

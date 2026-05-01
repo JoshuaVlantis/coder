@@ -7,7 +7,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -917,7 +916,7 @@ func (q *querier) newConn(c *connIO) {
 	if ok {
 		q.logger.Debug(q.ctx, "duplicate mapper found; closing old connection", slog.F("peer_id", dup.c.UniqueID()))
 		// overwrite and close the old one
-		atomic.StoreInt64(&c.overwrites, dup.c.Overwrites()+1)
+		c.SetOverwrites(dup.c.Overwrites() + 1)
 		err := dup.c.CoordinatorClose()
 		if err != nil {
 			q.logger.Error(q.ctx, "failed to close duplicate mapper", slog.F("peer_id", dup.c.UniqueID()), slog.Error(err))

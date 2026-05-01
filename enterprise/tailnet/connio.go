@@ -41,8 +41,8 @@ type connIO struct {
 
 	name       string
 	start      int64
-	lastWrite  int64
-	overwrites int64
+	lastWrite  atomic.Int64
+	overwrites atomic.Int64
 }
 
 func newConnIO(coordContext context.Context,
@@ -73,8 +73,8 @@ func newConnIO(coordContext context.Context,
 		auth:      auth,
 		name:      name,
 		start:     now,
-		lastWrite: now,
 	}
+	c.lastWrite.Store(now)
 	go c.recvLoop()
 	c.logger.Info(coordContext, "serving connection")
 	return c
@@ -254,7 +254,7 @@ func (c *connIO) UniqueID() uuid.UUID {
 }
 
 func (c *connIO) Enqueue(resp *proto.CoordinateResponse) error {
-	atomic.StoreInt64(&c.lastWrite, time.Now().Unix())
+	c.lastWrite.Store(time.Now().Unix())
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed {
@@ -276,11 +276,17 @@ func (c *connIO) Name() string {
 }
 
 func (c *connIO) Stats() (start int64, lastWrite int64) {
-	return c.start, atomic.LoadInt64(&c.lastWrite)
+	return c.start, c.lastWrite.Load()
 }
 
 func (c *connIO) Overwrites() int64 {
-	return atomic.LoadInt64(&c.overwrites)
+	return c.overwrites.Load()
+}
+
+// SetOverwrites stores the given count. Used by the coordinator when a
+// duplicate connection replaces this one.
+func (c *connIO) SetOverwrites(n int64) {
+	c.overwrites.Store(n)
 }
 
 // CoordinatorClose is used by the coordinator when closing a Queue. It

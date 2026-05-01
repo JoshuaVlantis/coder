@@ -529,3 +529,40 @@ func netAddrNil(m dsl.Matcher) {
 	m.Match("$_.RemoteAddr().Network()").Report("RemoteAddr() may return nil and segfault if you call Network()")
 	m.Match("$_.LocalAddr().Network()").Report("LocalAddr() may return nil and segfault if you call Network()")
 }
+
+// useTypedAtomics reports usage of the legacy sync/atomic free
+// functions (Add/Load/Store/Swap/CompareAndSwap on Int32/Int64/
+// Uint32/Uint64). The typed atomic.Int32/Int64/Uint32/Uint64 wrappers
+// introduced in Go 1.19 carry the alignment guarantee in their type
+// and prevent passing a non-atomic pointer by accident. Replace the
+// underlying variable or field type with the matching atomic wrapper
+// and call the method form (e.g. v.Add(1) instead of
+// atomic.AddInt64(&v, 1)).
+//
+//nolint:unused,deadcode,varnamelen
+func useTypedAtomics(m dsl.Matcher) {
+	m.Import("sync/atomic")
+
+	m.Match(
+		`atomic.AddInt32($_, $_)`,
+		`atomic.AddInt64($_, $_)`,
+		`atomic.AddUint32($_, $_)`,
+		`atomic.AddUint64($_, $_)`,
+		`atomic.LoadInt32($_)`,
+		`atomic.LoadInt64($_)`,
+		`atomic.LoadUint32($_)`,
+		`atomic.LoadUint64($_)`,
+		`atomic.StoreInt32($_, $_)`,
+		`atomic.StoreInt64($_, $_)`,
+		`atomic.StoreUint32($_, $_)`,
+		`atomic.StoreUint64($_, $_)`,
+		`atomic.SwapInt32($_, $_)`,
+		`atomic.SwapInt64($_, $_)`,
+		`atomic.SwapUint32($_, $_)`,
+		`atomic.SwapUint64($_, $_)`,
+		`atomic.CompareAndSwapInt32($_, $_, $_)`,
+		`atomic.CompareAndSwapInt64($_, $_, $_)`,
+		`atomic.CompareAndSwapUint32($_, $_, $_)`,
+		`atomic.CompareAndSwapUint64($_, $_, $_)`,
+	).Report(`Use the typed atomic.Int32/Int64/Uint32/Uint64 methods (Add/Load/Store/Swap/CompareAndSwap) instead of the legacy sync/atomic free functions. Change the variable or field type to atomic.Int32/Int64/etc.`)
+}

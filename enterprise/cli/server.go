@@ -166,6 +166,20 @@ func (r *RootCmd) Server(_ func()) *serpent.Command {
 		bridgeEnabled := options.DeploymentValues.AI.BridgeConfig.Enabled.Value()
 		proxyEnabled := options.DeploymentValues.AI.BridgeProxyConfig.Enabled.Value()
 		if bridgeEnabled || proxyEnabled {
+			// Reconcile env-derived AI Bridge provider configuration with
+			// the ai_providers table. Concurrent server starts are gated
+			// by a Postgres advisory lock; conflicts between env and DB
+			// fail startup with a clear error.
+			if err := coderd.SeedAIProvidersFromEnv(
+				ctx,
+				options.Database,
+				options.DeploymentValues.AI.BridgeConfig,
+				options.Auditor,
+				options.Logger.Named("aibridge.envseed"),
+			); err != nil {
+				return nil, nil, xerrors.Errorf("seed ai providers from env: %w", err)
+			}
+
 			providers, err := buildProviders(options.DeploymentValues.AI.BridgeConfig)
 			if err != nil {
 				return nil, nil, xerrors.Errorf("build aibridge providers: %w", err)

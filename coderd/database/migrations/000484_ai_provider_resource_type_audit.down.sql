@@ -1,0 +1,1 @@
+-- No-op: resource_type enum values cannot be removed safely.

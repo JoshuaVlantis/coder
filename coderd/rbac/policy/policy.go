@@ -392,6 +392,14 @@ var RBACPermissions = map[string]PermissionDefinition{
 			ActionCreate: "create aibridge interceptions & related records",
 		},
 	},
+	"aibridge_provider": {
+		Actions: map[Action]ActionDefinition{
+			ActionRead:   "read AI Bridge provider configuration",
+			ActionCreate: "create an AI Bridge provider",
+			ActionUpdate: "update an AI Bridge provider",
+			ActionDelete: "delete an AI Bridge provider",
+		},
+	},
 	"ai_seat": {
 		Actions: map[Action]ActionDefinition{
 			ActionCreate: "record AI seat usage",

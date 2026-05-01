@@ -1055,6 +1055,163 @@ func TestMCPServerConfigs(t *testing.T) {
 	})
 }
 
+func requireAIProviderDecrypted(
+	t *testing.T,
+	provider database.AiProvider,
+	ciphers []Cipher,
+	wantAPIKey, wantSettings string,
+) {
+	t.Helper()
+	require.Equal(t, wantAPIKey, provider.APIKey)
+	require.Equal(t, wantSettings, provider.Settings)
+	if wantAPIKey != "" {
+		require.Equal(t, ciphers[0].HexDigest(), provider.ApiKeyKeyID.String)
+	} else {
+		require.False(t, provider.ApiKeyKeyID.Valid)
+	}
+	if wantSettings != "" {
+		require.Equal(t, ciphers[0].HexDigest(), provider.SettingsKeyID.String)
+	} else {
+		require.False(t, provider.SettingsKeyID.Valid)
+	}
+}
+
+func requireAIProviderRawEncrypted(
+	ctx context.Context,
+	t *testing.T,
+	rawDB database.Store,
+	providerID uuid.UUID,
+	ciphers []Cipher,
+	wantAPIKey, wantSettings string,
+) {
+	t.Helper()
+	raw, err := rawDB.GetAIProviderByID(ctx, providerID)
+	require.NoError(t, err)
+	requireEncryptedEquals(t, ciphers[0], raw.APIKey, wantAPIKey)
+	requireEncryptedEquals(t, ciphers[0], raw.Settings, wantSettings)
+}
+
+func TestAIProviders(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	const (
+		//nolint:gosec // test credentials
+		apiKey   = "sk-test-api-key"
+		settings = `{"bedrock_region":"us-west-2","bedrock_model":"claude-sonnet"}`
+	)
+
+	insertProvider := func(t *testing.T, crypt *dbCrypt, ciphers []Cipher) database.AiProvider {
+		t.Helper()
+		provider := dbgen.AIProvider(t, crypt, database.AiProvider{
+			Name:     "openai-test",
+			Type:     database.AiProviderTypeOpenai,
+			BaseUrl:  "https://api.openai.com/v1/",
+			APIKey:   apiKey,
+			Settings: settings,
+		})
+		requireAIProviderDecrypted(t, provider, ciphers, apiKey, settings)
+		return provider
+	}
+
+	t.Run("InsertAIProvider", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, ciphers := setup(t)
+		provider := insertProvider(t, crypt, ciphers)
+		requireAIProviderRawEncrypted(ctx, t, db, provider.ID, ciphers, apiKey, settings)
+	})
+
+	t.Run("InsertAIProviderEmptyFields", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, _ := setup(t)
+		provider := dbgen.AIProvider(t, crypt, database.AiProvider{
+			Name: "openai-empty",
+		}, func(p *database.InsertAIProviderParams) {
+			p.APIKey = ""
+			p.Settings = ""
+		})
+		require.False(t, provider.ApiKeyKeyID.Valid)
+		require.False(t, provider.SettingsKeyID.Valid)
+		raw, err := db.GetAIProviderByID(ctx, provider.ID)
+		require.NoError(t, err)
+		require.Empty(t, raw.APIKey)
+		require.Empty(t, raw.Settings)
+	})
+
+	t.Run("GetAIProviderByID", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, ciphers := setup(t)
+		provider := insertProvider(t, crypt, ciphers)
+		got, err := crypt.GetAIProviderByID(ctx, provider.ID)
+		require.NoError(t, err)
+		requireAIProviderDecrypted(t, got, ciphers, apiKey, settings)
+		requireAIProviderRawEncrypted(ctx, t, db, provider.ID, ciphers, apiKey, settings)
+	})
+
+	t.Run("GetAIProviderByName", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, ciphers := setup(t)
+		provider := insertProvider(t, crypt, ciphers)
+		got, err := crypt.GetAIProviderByName(ctx, provider.Name)
+		require.NoError(t, err)
+		requireAIProviderDecrypted(t, got, ciphers, apiKey, settings)
+		requireAIProviderRawEncrypted(ctx, t, db, provider.ID, ciphers, apiKey, settings)
+	})
+
+	t.Run("GetAIProviders", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, ciphers := setup(t)
+		provider := insertProvider(t, crypt, ciphers)
+		providers, err := crypt.GetAIProviders(ctx)
+		require.NoError(t, err)
+		require.Len(t, providers, 1)
+		requireAIProviderDecrypted(t, providers[0], ciphers, apiKey, settings)
+		requireAIProviderRawEncrypted(ctx, t, db, provider.ID, ciphers, apiKey, settings)
+	})
+
+	t.Run("UpdateAIProvider", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, ciphers := setup(t)
+		provider := insertProvider(t, crypt, ciphers)
+		const (
+			newAPIKey   = "sk-rotated"
+			newSettings = `{"bedrock_region":"us-east-1"}`
+		)
+		updated, err := crypt.UpdateAIProvider(ctx, database.UpdateAIProviderParams{
+			ID:          provider.ID,
+			DisplayName: provider.DisplayName,
+			Enabled:     provider.Enabled,
+			BaseUrl:     provider.BaseUrl,
+			APIKey:      newAPIKey,
+			Settings:    newSettings,
+		})
+		require.NoError(t, err)
+		requireAIProviderDecrypted(t, updated, ciphers, newAPIKey, newSettings)
+		requireAIProviderRawEncrypted(ctx, t, db, provider.ID, ciphers, newAPIKey, newSettings)
+	})
+
+	t.Run("UpdateAIProviderClearsSecrets", func(t *testing.T) {
+		t.Parallel()
+		db, crypt, ciphers := setup(t)
+		provider := insertProvider(t, crypt, ciphers)
+		updated, err := crypt.UpdateAIProvider(ctx, database.UpdateAIProviderParams{
+			ID:          provider.ID,
+			DisplayName: provider.DisplayName,
+			Enabled:     provider.Enabled,
+			BaseUrl:     provider.BaseUrl,
+			APIKey:      "",
+			Settings:    "",
+		})
+		require.NoError(t, err)
+		require.False(t, updated.ApiKeyKeyID.Valid)
+		require.False(t, updated.SettingsKeyID.Valid)
+		raw, err := db.GetAIProviderByID(ctx, provider.ID)
+		require.NoError(t, err)
+		require.Empty(t, raw.APIKey)
+		require.Empty(t, raw.Settings)
+	})
+}
+
 func TestMCPServerUserTokens(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

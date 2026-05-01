@@ -19487,6 +19487,7 @@ const docTemplate = `{
                 "*",
                 "ai_seat",
                 "aibridge_interception",
+                "aibridge_provider",
                 "api_key",
                 "assign_org_role",
                 "assign_role",
@@ -19534,6 +19535,7 @@ const docTemplate = `{
                 "ResourceWildcard",
                 "ResourceAiSeat",
                 "ResourceAibridgeInterception",
+                "ResourceAibridgeProvider",
                 "ResourceApiKey",
                 "ResourceAssignOrgRole",
                 "ResourceAssignRole",
@@ -19787,6 +19789,7 @@ const docTemplate = `{
                 "workspace_app",
                 "task",
                 "ai_seat",
+                "ai_provider",
                 "chat",
                 "user_secret"
             ],
@@ -19818,6 +19821,7 @@ const docTemplate = `{
                 "ResourceTypeWorkspaceApp",
                 "ResourceTypeTask",
                 "ResourceTypeAISeat",
+                "ResourceTypeAIProvider",
                 "ResourceTypeChat",
                 "ResourceTypeUserSecret"
             ]

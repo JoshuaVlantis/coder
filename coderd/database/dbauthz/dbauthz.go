@@ -2451,6 +2451,34 @@ func (q *querier) GetAIBridgeUserPromptsByInterceptionID(ctx context.Context, in
 	return q.db.GetAIBridgeUserPromptsByInterceptionID(ctx, interceptionID)
 }
 
+func (q *querier) GetAIProviderByID(ctx context.Context, id uuid.UUID) (database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceAibridgeProvider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return q.db.GetAIProviderByID(ctx, id)
+}
+
+func (q *querier) GetAIProviderByName(ctx context.Context, name string) (database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceAibridgeProvider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return q.db.GetAIProviderByName(ctx, name)
+}
+
+func (q *querier) GetAIProviderByNameIncludeDeleted(ctx context.Context, name string) (database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceAibridgeProvider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return q.db.GetAIProviderByNameIncludeDeleted(ctx, name)
+}
+
+func (q *querier) GetAIProviders(ctx context.Context) ([]database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceAibridgeProvider); err != nil {
+		return nil, err
+	}
+	return q.db.GetAIProviders(ctx)
+}
+
 func (q *querier) GetAPIKeyByID(ctx context.Context, id string) (database.APIKey, error) {
 	return fetch(q.log, q.auth, q.db.GetAPIKeyByID)(ctx, id)
 }
@@ -3119,6 +3147,13 @@ func (q *querier) GetDeploymentWorkspaceStats(ctx context.Context) (database.Get
 
 func (q *querier) GetEligibleProvisionerDaemonsByProvisionerJobIDs(ctx context.Context, provisionerJobIDs []uuid.UUID) ([]database.GetEligibleProvisionerDaemonsByProvisionerJobIDsRow, error) {
 	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetEligibleProvisionerDaemonsByProvisionerJobIDs)(ctx, provisionerJobIDs)
+}
+
+func (q *querier) GetEnabledAIProviders(ctx context.Context) ([]database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionRead, rbac.ResourceAibridgeProvider); err != nil {
+		return nil, err
+	}
+	return q.db.GetEnabledAIProviders(ctx)
 }
 
 func (q *querier) GetEnabledChatModelConfigByID(ctx context.Context, id uuid.UUID) (database.ChatModelConfig, error) {
@@ -5055,6 +5090,13 @@ func (q *querier) InsertAIBridgeUserPrompt(ctx context.Context, arg database.Ins
 	return q.db.InsertAIBridgeUserPrompt(ctx, arg)
 }
 
+func (q *querier) InsertAIProvider(ctx context.Context, arg database.InsertAIProviderParams) (database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionCreate, rbac.ResourceAibridgeProvider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return q.db.InsertAIProvider(ctx, arg)
+}
+
 func (q *querier) InsertAPIKey(ctx context.Context, arg database.InsertAPIKeyParams) (database.APIKey, error) {
 	// TODO(Cian): ideally this would be encoded in the policy, but system users are just members and we
 	// don't currently have a capability to conditionally deny creating resources by owner ID in a role.
@@ -5977,6 +6019,13 @@ func (q *querier) SelectUsageEventsForPublishing(ctx context.Context, arg time.T
 	return q.db.SelectUsageEventsForPublishing(ctx, arg)
 }
 
+func (q *querier) SoftDeleteAIProviderByID(ctx context.Context, id uuid.UUID) (database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionDelete, rbac.ResourceAibridgeProvider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return q.db.SoftDeleteAIProviderByID(ctx, id)
+}
+
 func (q *querier) SoftDeleteChatMessageByID(ctx context.Context, id int64) error {
 	msg, err := q.db.GetChatMessageByID(ctx, id)
 	if err != nil {
@@ -6097,6 +6146,13 @@ func (q *querier) UpdateAIBridgeInterceptionEnded(ctx context.Context, params da
 		return database.AIBridgeInterception{}, err
 	}
 	return q.db.UpdateAIBridgeInterceptionEnded(ctx, params)
+}
+
+func (q *querier) UpdateAIProvider(ctx context.Context, arg database.UpdateAIProviderParams) (database.AiProvider, error) {
+	if err := q.authorizeContext(ctx, policy.ActionUpdate, rbac.ResourceAibridgeProvider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return q.db.UpdateAIProvider(ctx, arg)
 }
 
 func (q *querier) UpdateAPIKeyByID(ctx context.Context, arg database.UpdateAPIKeyByIDParams) error {

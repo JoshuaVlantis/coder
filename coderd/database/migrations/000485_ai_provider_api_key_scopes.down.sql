@@ -1,0 +1,1 @@
+-- No-op: api_key_scope enum values cannot be removed safely.

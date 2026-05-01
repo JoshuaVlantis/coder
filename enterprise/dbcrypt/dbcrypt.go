@@ -385,6 +385,117 @@ func (db *dbCrypt) GetCryptoKeysByFeature(ctx context.Context, feature database.
 	return keys, nil
 }
 
+// decryptAIProvider decrypts the secret fields of an AI Bridge provider row.
+func (db *dbCrypt) decryptAIProvider(p *database.AiProvider) error {
+	if err := db.decryptField(&p.APIKey, p.ApiKeyKeyID); err != nil {
+		return err
+	}
+	return db.decryptField(&p.Settings, p.SettingsKeyID)
+}
+
+func (db *dbCrypt) GetAIProviderByID(ctx context.Context, id uuid.UUID) (database.AiProvider, error) {
+	provider, err := db.Store.GetAIProviderByID(ctx, id)
+	if err != nil {
+		return database.AiProvider{}, err
+	}
+	if err := db.decryptAIProvider(&provider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return provider, nil
+}
+
+func (db *dbCrypt) GetAIProviderByName(ctx context.Context, name string) (database.AiProvider, error) {
+	provider, err := db.Store.GetAIProviderByName(ctx, name)
+	if err != nil {
+		return database.AiProvider{}, err
+	}
+	if err := db.decryptAIProvider(&provider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return provider, nil
+}
+
+func (db *dbCrypt) GetAIProviderByNameIncludeDeleted(ctx context.Context, name string) (database.AiProvider, error) {
+	provider, err := db.Store.GetAIProviderByNameIncludeDeleted(ctx, name)
+	if err != nil {
+		return database.AiProvider{}, err
+	}
+	if err := db.decryptAIProvider(&provider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return provider, nil
+}
+
+func (db *dbCrypt) GetAIProviders(ctx context.Context) ([]database.AiProvider, error) {
+	providers, err := db.Store.GetAIProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range providers {
+		if err := db.decryptAIProvider(&providers[i]); err != nil {
+			return nil, err
+		}
+	}
+	return providers, nil
+}
+
+func (db *dbCrypt) GetEnabledAIProviders(ctx context.Context) ([]database.AiProvider, error) {
+	providers, err := db.Store.GetEnabledAIProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range providers {
+		if err := db.decryptAIProvider(&providers[i]); err != nil {
+			return nil, err
+		}
+	}
+	return providers, nil
+}
+
+func (db *dbCrypt) InsertAIProvider(ctx context.Context, params database.InsertAIProviderParams) (database.AiProvider, error) {
+	if strings.TrimSpace(params.APIKey) == "" {
+		params.ApiKeyKeyID = sql.NullString{}
+	} else if err := db.encryptField(&params.APIKey, &params.ApiKeyKeyID); err != nil {
+		return database.AiProvider{}, err
+	}
+	if strings.TrimSpace(params.Settings) == "" {
+		params.SettingsKeyID = sql.NullString{}
+	} else if err := db.encryptField(&params.Settings, &params.SettingsKeyID); err != nil {
+		return database.AiProvider{}, err
+	}
+
+	provider, err := db.Store.InsertAIProvider(ctx, params)
+	if err != nil {
+		return database.AiProvider{}, err
+	}
+	if err := db.decryptAIProvider(&provider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return provider, nil
+}
+
+func (db *dbCrypt) UpdateAIProvider(ctx context.Context, params database.UpdateAIProviderParams) (database.AiProvider, error) {
+	if strings.TrimSpace(params.APIKey) == "" {
+		params.ApiKeyKeyID = sql.NullString{}
+	} else if err := db.encryptField(&params.APIKey, &params.ApiKeyKeyID); err != nil {
+		return database.AiProvider{}, err
+	}
+	if strings.TrimSpace(params.Settings) == "" {
+		params.SettingsKeyID = sql.NullString{}
+	} else if err := db.encryptField(&params.Settings, &params.SettingsKeyID); err != nil {
+		return database.AiProvider{}, err
+	}
+
+	provider, err := db.Store.UpdateAIProvider(ctx, params)
+	if err != nil {
+		return database.AiProvider{}, err
+	}
+	if err := db.decryptAIProvider(&provider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return provider, nil
+}
+
 func (db *dbCrypt) GetChatProviderByID(ctx context.Context, id uuid.UUID) (database.ChatProvider, error) {
 	provider, err := db.Store.GetChatProviderByID(ctx, id)
 	if err != nil {

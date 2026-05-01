@@ -1000,6 +1000,14 @@ func (m queryMetricsStore) GetAIProviders(ctx context.Context) ([]database.AiPro
 	return r0, r1
 }
 
+func (m queryMetricsStore) GetAIProvidersForRotation(ctx context.Context) ([]database.AiProvider, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetAIProvidersForRotation(ctx)
+	m.queryLatencies.WithLabelValues("GetAIProvidersForRotation").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetAIProvidersForRotation").Inc()
+	return r0, r1
+}
+
 func (m queryMetricsStore) GetAPIKeyByID(ctx context.Context, id string) (database.APIKey, error) {
 	start := time.Now()
 	r0, r1 := m.s.GetAPIKeyByID(ctx, id)
@@ -4461,6 +4469,14 @@ func (m queryMetricsStore) UpdateAIProvider(ctx context.Context, arg database.Up
 	r0, r1 := m.s.UpdateAIProvider(ctx, arg)
 	m.queryLatencies.WithLabelValues("UpdateAIProvider").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpdateAIProvider").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) UpdateAIProviderEncryptedColumns(ctx context.Context, arg database.UpdateAIProviderEncryptedColumnsParams) (database.AiProvider, error) {
+	start := time.Now()
+	r0, r1 := m.s.UpdateAIProviderEncryptedColumns(ctx, arg)
+	m.queryLatencies.WithLabelValues("UpdateAIProviderEncryptedColumns").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpdateAIProviderEncryptedColumns").Inc()
 	return r0, r1
 }
 

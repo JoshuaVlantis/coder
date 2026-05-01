@@ -496,6 +496,49 @@ func (db *dbCrypt) UpdateAIProvider(ctx context.Context, params database.UpdateA
 	return provider, nil
 }
 
+// GetAIProvidersForRotation returns every AI provider row, including
+// soft-deleted ones, with their secret columns decrypted. The dbcrypt
+// key rotation utility uses this to walk every row holding a foreign-
+// key reference to dbcrypt_keys before old keys are revoked.
+func (db *dbCrypt) GetAIProvidersForRotation(ctx context.Context) ([]database.AiProvider, error) {
+	providers, err := db.Store.GetAIProvidersForRotation(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range providers {
+		if err := db.decryptAIProvider(&providers[i]); err != nil {
+			return nil, err
+		}
+	}
+	return providers, nil
+}
+
+// UpdateAIProviderEncryptedColumns re-encrypts the api_key and
+// settings columns of a row, regardless of its deleted flag, so that
+// dbcrypt key rotation can move every FK reference to a new key
+// digest before old keys are revoked.
+func (db *dbCrypt) UpdateAIProviderEncryptedColumns(ctx context.Context, params database.UpdateAIProviderEncryptedColumnsParams) (database.AiProvider, error) {
+	if strings.TrimSpace(params.APIKey) == "" {
+		params.ApiKeyKeyID = sql.NullString{}
+	} else if err := db.encryptField(&params.APIKey, &params.ApiKeyKeyID); err != nil {
+		return database.AiProvider{}, err
+	}
+	if strings.TrimSpace(params.Settings) == "" {
+		params.SettingsKeyID = sql.NullString{}
+	} else if err := db.encryptField(&params.Settings, &params.SettingsKeyID); err != nil {
+		return database.AiProvider{}, err
+	}
+
+	provider, err := db.Store.UpdateAIProviderEncryptedColumns(ctx, params)
+	if err != nil {
+		return database.AiProvider{}, err
+	}
+	if err := db.decryptAIProvider(&provider); err != nil {
+		return database.AiProvider{}, err
+	}
+	return provider, nil
+}
+
 func (db *dbCrypt) GetChatProviderByID(ctx context.Context, id uuid.UUID) (database.ChatProvider, error) {
 	provider, err := db.Store.GetChatProviderByID(ctx, id)
 	if err != nil {

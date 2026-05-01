@@ -23,6 +23,21 @@ coder server --aibridge-enabled=true
 
 AI Gateway proxies requests to upstream LLM APIs. Configure at least one provider before exposing AI Gateway to end users.
 
+> [!IMPORTANT]
+> The legacy environment variables documented below
+> (`CODER_AIBRIDGE_OPENAI_*`, `CODER_AIBRIDGE_ANTHROPIC_*`,
+> `CODER_AIBRIDGE_BEDROCK_*`, and the indexed
+> `CODER_AIBRIDGE_PROVIDER_<N>_*` form) are **deprecated**. They
+> still work today and existing deployments need no changes, but the
+> recommended way to manage providers going forward is the
+> `/api/v2/aibridge/providers` API.
+>
+> On startup, environment-derived providers are reconciled into the
+> `ai_providers` database table; thereafter, `coderd` reads provider
+> configuration from the database and hot-reloads it across replicas
+> when changes are made via the API. The CLI (and an upcoming
+> Settings UI) builds on top of this API.
+
 <div class="tabs">
 
 ### OpenAI
@@ -122,7 +137,7 @@ For deployments when explicit credentials are preferred, provide an access key a
 
 GitHub Copilot offers three plans — Individual, Business, and Enterprise —
 each with its own API endpoint. Configure one or more `copilot` providers
-using the [indexed provider format](#multiple-instances-of-the-same-provider)
+using the [indexed provider format](#multiple-instances-of-the-same-provider-deprecated-env-var-form)
 depending on which plans your organization uses.
 Copilot providers use OAuth app installations for authentication rather than
 static API keys.
@@ -166,7 +181,42 @@ export CODER_AIBRIDGE_PROVIDER_0_BASE_URL=https://chatgpt.com/backend-api/codex
 > [!NOTE]
 > See the [Supported APIs](./reference.md#supported-apis) section below for precise endpoint coverage and interception behavior.
 
-### Multiple instances of the same provider
+### Manage providers via the API
+
+The `/api/v2/aibridge/providers` API is the recommended way to manage providers. It supports:
+
+- `GET /api/v2/aibridge/providers`: list all providers (secrets are never returned).
+- `POST /api/v2/aibridge/providers`: create a provider.
+- `GET /api/v2/aibridge/providers/{idOrName}`: fetch one.
+- `PATCH /api/v2/aibridge/providers/{idOrName}`: partial update.
+- `DELETE /api/v2/aibridge/providers/{idOrName}`: soft-delete.
+
+Each mutation publishes a `ai_providers_changed` event on the database pubsub, which every replica subscribes to. Replicas atomically swap their cached `RequestBridge` instances so subsequent requests use the new configuration. In-flight requests continue against their existing bridge until completion.
+
+```sh
+# Example: create an OpenAI provider via the API.
+curl -X POST "$CODER_URL/api/v2/aibridge/providers" \
+  -H "Coder-Session-Token: $CODER_SESSION_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "openai",
+    "name": "openai-team-a",
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "sk-...",
+    "enabled": true
+  }'
+```
+
+Names are validated to match `^[a-z0-9]+(-[a-z0-9]+)*$` and must not collide with the reserved sub-paths `proxy`, `providers`, `interceptions`, `sessions`, `models`, or `clients`. Soft-deleted names remain reserved. Per-row provider settings (including the AWS Bedrock access-key secret) are encrypted at rest.
+
+### Multiple instances of the same provider (deprecated, env var form)
+
+> [!IMPORTANT]
+> The indexed `CODER_AIBRIDGE_PROVIDER_<N>_*` env var form is
+> retained for backward compatibility but is deprecated. Prefer the
+> [API](#manage-providers-via-the-api) for new providers; on
+> startup, indexed env vars are seeded into the database alongside
+> the legacy single-provider env vars.
 
 You can configure multiple instances of the same provider type — for example, to
 route different teams to separate API keys, use different base URLs per region, or

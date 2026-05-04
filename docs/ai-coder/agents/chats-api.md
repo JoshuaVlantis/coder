@@ -82,15 +82,16 @@ A typical integration follows three steps:
 
 `POST /api/experimental/chats`
 
-| Field             | Type                | Required | Description                                     |
-|-------------------|---------------------|----------|-------------------------------------------------|
-| `content`         | `ChatInputPart[]`   | yes      | The user's prompt as one or more content parts. |
-| `organization_id` | `uuid`              | yes      | The organization this chat belongs to.          |
-| `workspace_id`    | `uuid`              | no       | Pin the chat to a specific workspace.           |
-| `model_config_id` | `uuid`              | no       | Override the default model configuration.       |
-| `mcp_server_ids`  | `uuid[]`            | no       | Attach MCP servers to this chat.                |
-| `labels`          | `map[string]string` | no       | Key-value labels for the chat (max 50).         |
-| `client_type`     | `string`            | no       | `"ui"` or `"api"`. Defaults to `"api"`.         |
+| Field             | Type                | Required | Description                                                                                                                                     |
+|-------------------|---------------------|----------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| `content`         | `ChatInputPart[]`   | yes      | The user's prompt as one or more content parts.                                                                                                 |
+| `organization_id` | `uuid`              | yes      | The organization this chat belongs to.                                                                                                          |
+| `owner_id`        | `uuid`              | no       | Create the chat on behalf of this user. Requires site-level chat-create permission (e.g. the Owner role). The user must be a member of the org. |
+| `workspace_id`    | `uuid`              | no       | Pin the chat to a specific workspace.                                                                                                           |
+| `model_config_id` | `uuid`              | no       | Override the default model configuration.                                                                                                       |
+| `mcp_server_ids`  | `uuid[]`            | no       | Attach MCP servers to this chat.                                                                                                                |
+| `labels`          | `map[string]string` | no       | Key-value labels for the chat (max 50).                                                                                                         |
+| `client_type`     | `string`            | no       | `"ui"` or `"api"`. Defaults to `"api"`.                                                                                                         |
 
 Each `ChatInputPart` has a `type` field. The simplest form is a text part:
 

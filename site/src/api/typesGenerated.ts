@@ -4676,6 +4676,41 @@ export const MaxChatFileIDs = 20;
  */
 export const MaxSecretValueSize = 32768; // 32KB
 
+// From codersdk/usersecretvalidation.go
+/**
+ * MaxSecretsPayloadSize is the maximum cumulative wire size of a
+ * user's secrets when injected into the provisioner's environment
+ * at workspace build time. See SecretBuildTimeWireSize for the
+ * per-secret formula.
+ *
+ * The OS limits this matters against:
+ *   - Linux ARG_MAX:  typically 2 MiB (argv + envp combined)
+ *   - macOS ARG_MAX:  typically 1 MiB
+ *
+ * Picking 256 KiB leaves comfortable headroom for the rest of
+ * provisionEnv's output (workspace metadata, parameters, agent
+ * scripts) and terraform's own environment, on both platforms.
+ * At 32 KiB per secret value, this still permits 8 maxed-out
+ * secrets, or many more secrets at typical sizes.
+ *
+ * We do not expose this as a deployment flag; the cap is OS-driven
+ * and a too-high value reintroduces the cryptic
+ * "argument list too long" failure mode this guardrail exists to
+ * prevent. See https://linear.app/codercom/issue/PLAT-144 .
+ */
+export const MaxSecretsPayloadSize = 262144;
+
+// From codersdk/usersecretvalidation.go
+/**
+ * MaxSecretsPerUser is a sanity cap on the number of user secrets
+ * per user. The load-bearing guardrail is MaxSecretsPayloadSize
+ * below; this exists so a user cannot accumulate a pathological
+ * number of tiny secrets that pass the byte budget but make the
+ * secrets-management UI and the build-time fetch expensive to
+ * scan and paginate.
+ */
+export const MaxSecretsPerUser = 100;
+
 // From codersdk/organizations.go
 export interface MinimalOrganization {
 	readonly id: string;

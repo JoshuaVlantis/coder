@@ -26,6 +26,35 @@ const (
 	// (legacy MAX_PATH is 260), but the agent will surface a
 	// runtime error if the write fails.
 	maxFilePathLength = 4096
+
+	// MaxSecretsPerUser is a sanity cap on the number of user secrets
+	// per user. The load-bearing guardrail is MaxSecretsPayloadSize
+	// below; this exists so a user cannot accumulate a pathological
+	// number of tiny secrets that pass the byte budget but make the
+	// secrets-management UI and the build-time fetch expensive to
+	// scan and paginate.
+	MaxSecretsPerUser = 100
+
+	// MaxSecretsPayloadSize is the maximum cumulative wire size of a
+	// user's secrets when injected into the provisioner's environment
+	// at workspace build time. See SecretBuildTimeWireSize for the
+	// per-secret formula.
+	//
+	// The OS limits this matters against:
+	//   - Linux ARG_MAX:  typically 2 MiB (argv + envp combined)
+	//   - macOS ARG_MAX:  typically 1 MiB
+	//
+	// Picking 256 KiB leaves comfortable headroom for the rest of
+	// provisionEnv's output (workspace metadata, parameters, agent
+	// scripts) and terraform's own environment, on both platforms.
+	// At 32 KiB per secret value, this still permits 8 maxed-out
+	// secrets, or many more secrets at typical sizes.
+	//
+	// We do not expose this as a deployment flag; the cap is OS-driven
+	// and a too-high value reintroduces the cryptic
+	// "argument list too long" failure mode this guardrail exists to
+	// prevent. See https://linear.app/codercom/issue/PLAT-144 .
+	MaxSecretsPayloadSize = 256 * 1024
 )
 
 var (
@@ -198,4 +227,31 @@ func UserSecretValueValid(value string) error {
 	}
 
 	return nil
+}
+
+// SecretBuildTimeWireSize returns the number of bytes a single user
+// secret will contribute to the provisioner's environment when injected
+// at workspace build time. It must stay in sync with the format used
+// by provisionEnv in provisioner/terraform/provision.go:
+//
+//	env-bound:  "CODER_SECRET_ENV_<name>=<value>\0"
+//	file-bound: "CODER_SECRET_FILE_<hex(path)>=<value>\0"
+//
+// A secret that has both env_name and file_path bound contributes
+// twice, once for each entry, matching how provisionEnv injects it.
+// A secret with neither bound contributes zero (provisionerdserver
+// filters those out before they reach terraform).
+//
+// The trailing +1 on each entry counts the NUL terminator that the
+// kernel includes when measuring envp against ARG_MAX. Callers should
+// pass the raw byte length of the value, not the rune count.
+func SecretBuildTimeWireSize(envName, filePath string, valueLen int) int {
+	var n int
+	if envName != "" {
+		n += len("CODER_SECRET_ENV_") + len(envName) + 1 + valueLen + 1
+	}
+	if filePath != "" {
+		n += len("CODER_SECRET_FILE_") + 2*len(filePath) + 1 + valueLen + 1
+	}
+	return n
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/provisionersdk/proto"
 )
 
@@ -116,4 +117,61 @@ func TestProvisionEnv_InputSecretsSurviveHostCollision(t *testing.T) {
 		"caller-supplied secret must be present")
 	assert.NotContains(t, env, "CODER_SECRET_ENV_COLLIDE=host-value-should-not-win",
 		"host value must be stripped before secrets are appended")
+}
+
+// TestProvisionEnv_WireSizeMatchesSDK is a cross-check between the
+// build-time injection format used by provisionEnv and the size formula
+// in codersdk.SecretBuildTimeWireSize. The CRUD budget validator,
+// provisionerdserver precheck, and any operator-facing reporting all
+// rely on that formula being correct. If anyone changes the injection
+// format here without updating the formula (or vice versa), this test
+// fails. Loud is good.
+//
+// We measure each CODER_SECRET_* entry as len(entry)+1 because that is
+// how the kernel measures envp against ARG_MAX: each string contributes
+// its bytes plus one NUL terminator.
+func TestProvisionEnv_WireSizeMatchesSDK(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name     string
+		envName  string
+		filePath string
+		value    string
+	}{
+		{name: "EnvOnly", envName: "MY_TOKEN", value: "abc123"},
+		{name: "FileOnly", filePath: "~/.ssh/id_rsa", value: "key-data"},
+		{name: "BothEnvAndFile", envName: "DUAL", filePath: "/tmp/dual", value: "v"},
+		{name: "EmptyValueEnvOnly", envName: "EMPTY", value: ""},
+		{name: "LongValueFileOnly", filePath: "/etc/some/cert.pem", value: strings.Repeat("a", 4096)},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			secrets := []*proto.UserSecretValue{{
+				EnvName:  tc.envName,
+				FilePath: tc.filePath,
+				Value:    []byte(tc.value),
+			}}
+			env, err := provisionEnv(&proto.Config{}, &proto.Metadata{}, nil, nil, nil, secrets)
+			require.NoError(t, err)
+
+			// Sum the wire size of every CODER_SECRET_* entry that
+			// provisionEnv emitted for this secret. Each entry counts
+			// its string length plus a NUL terminator.
+			var got int
+			for _, e := range env {
+				if strings.HasPrefix(e, "CODER_SECRET_ENV_") || strings.HasPrefix(e, "CODER_SECRET_FILE_") {
+					got += len(e) + 1
+				}
+			}
+
+			want := codersdk.SecretBuildTimeWireSize(tc.envName, tc.filePath, len(tc.value))
+			assert.Equal(t, want, got,
+				"codersdk.SecretBuildTimeWireSize must match the actual wire size emitted by provisionEnv. "+
+					"if either side changes, update both")
+		})
+	}
 }

@@ -193,3 +193,92 @@ func TestUserSecretValueValid(t *testing.T) {
 		})
 	}
 }
+
+// TestUserSecretBudgetConstants pins the per-user secret-payload budget
+// and count cap. Changing either is a deliberate decision; the tests
+// here exist so the change shows up in review and so other layers
+// (provisionerdserver precheck, agent manifest) cannot drift.
+func TestUserSecretBudgetConstants(t *testing.T) {
+	t.Parallel()
+
+	// 256 KiB matches the plan in PLAT-144: well below the typical
+	// Linux ARG_MAX of 2 MiB and macOS ARG_MAX of 1 MiB, with headroom
+	// for the rest of provisionEnv's output and terraform's own env.
+	assert.Equal(t, 256*1024, codersdk.MaxSecretsPayloadSize,
+		"MaxSecretsPayloadSize is the load-bearing guardrail; keep it "+
+			"comfortably under the smallest supported ARG_MAX (1 MiB on macOS)")
+
+	// 100 is a complementary sanity cap, not the load-bearing one.
+	assert.Equal(t, 100, codersdk.MaxSecretsPerUser)
+
+	// Ensure the per-secret value cap has not silently grown into the
+	// territory where a single secret could blow the per-user budget.
+	assert.LessOrEqual(t, codersdk.MaxSecretValueSize, codersdk.MaxSecretsPayloadSize/8,
+		"per-secret cap should be well under the per-user budget so a "+
+			"reasonable user can store multiple maxed-out secrets")
+}
+
+func TestSecretBuildTimeWireSize(t *testing.T) {
+	t.Parallel()
+
+	// The expected sizes below are computed by hand from the format used
+	// in provisioner/terraform/provision.go's provisionEnv:
+	//
+	//   env-bound:  "CODER_SECRET_ENV_<name>=<value>\0"
+	//   file-bound: "CODER_SECRET_FILE_<hex(path)>=<value>\0"
+	//
+	// Constants:
+	//   len("CODER_SECRET_ENV_")  = 17
+	//   len("CODER_SECRET_FILE_") = 18
+	//   hex(path) is 2 bytes per source byte
+	//   each entry has a trailing NUL terminator (the +1 below)
+	tests := []struct {
+		name     string
+		envName  string
+		filePath string
+		valueLen int
+		want     int
+	}{
+		{
+			name:     "EnvOnly",
+			envName:  "FOO",
+			valueLen: 5,
+			// 17 + len("FOO") + 1 ("=") + 5 + 1 (NUL) = 27.
+			want: 17 + 3 + 1 + 5 + 1,
+		},
+		{
+			name:     "FileOnly",
+			filePath: "~/x", // 3 bytes -> 6 hex chars.
+			valueLen: 5,
+			// 18 + 6 + 1 ("=") + 5 + 1 (NUL) = 31.
+			want: 18 + 6 + 1 + 5 + 1,
+		},
+		{
+			name:     "BothEnvAndFile",
+			envName:  "FOO",
+			filePath: "~/x",
+			valueLen: 5,
+			// Both contributions added.
+			want: (17 + 3 + 1 + 5 + 1) + (18 + 6 + 1 + 5 + 1),
+		},
+		{
+			name:     "NeitherBound",
+			valueLen: 5,
+			want:     0,
+		},
+		{
+			name:     "EmptyValue",
+			envName:  "FOO",
+			valueLen: 0,
+			want:     17 + 3 + 1 + 0 + 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := codersdk.SecretBuildTimeWireSize(tt.envName, tt.filePath, tt.valueLen)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}

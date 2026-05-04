@@ -3,6 +3,7 @@ import {
 	type FC,
 	Fragment,
 	memo,
+	type ReactNode,
 	useLayoutEffect,
 	useRef,
 	useState,
@@ -13,7 +14,6 @@ import type { UrlTransform } from "streamdown";
 import { preferenceSettings } from "#/api/queries/users";
 import type * as TypesGen from "#/api/typesGenerated";
 import type { ThinkingDisplayMode } from "#/api/typesGenerated";
-
 import { Button } from "#/components/Button/Button";
 import {
 	Collapsible,
@@ -27,7 +27,6 @@ import {
 	TooltipTrigger,
 } from "#/components/Tooltip/Tooltip";
 import { cn } from "#/utils/cn";
-
 import {
 	ConversationItem,
 	Message,
@@ -44,6 +43,7 @@ import {
 	AttachmentBlock,
 	type PreviewTextAttachment,
 } from "./AttachmentBlocks";
+import { compareBoundaryPosition } from "./chatHelpers";
 import { ExpiredFileIdsProvider } from "./ExpiredFileIdsContext";
 import { deriveMessageDisplayState } from "./messageHelpers";
 import { getEditableUserMessagePayload } from "./messageParsing";
@@ -964,7 +964,19 @@ function computeLastInChainFlags(
 	return flags;
 }
 
+const ContextBoundaryDivider: FC = () => (
+	<div
+		data-testid="context-boundary-divider"
+		className="flex items-center gap-3 py-2 text-xs font-medium text-content-secondary"
+	>
+		<div className="h-px flex-1 bg-border" />
+		<span>Context boundary</span>
+		<div className="h-px flex-1 bg-border" />
+	</div>
+);
+
 interface ConversationTimelineProps {
+	boundaries?: readonly TypesGen.ChatContextBoundary[];
 	parsedMessages: readonly ParsedMessageEntry[];
 	subagentTitles: Map<string, string>;
 	subagentVariants?: Map<string, SubagentVariant>;
@@ -985,6 +997,7 @@ interface ConversationTimelineProps {
 
 export const ConversationTimeline = memo<ConversationTimelineProps>(
 	({
+		boundaries = [],
 		parsedMessages,
 		subagentTitles,
 		subagentVariants,
@@ -999,7 +1012,7 @@ export const ConversationTimeline = memo<ConversationTimelineProps>(
 	}) => {
 		const lastInChainFlags = computeLastInChainFlags(parsedMessages);
 
-		if (parsedMessages.length === 0) {
+		if (parsedMessages.length === 0 && boundaries.length === 0) {
 			return null;
 		}
 
@@ -1055,54 +1068,132 @@ export const ConversationTimeline = memo<ConversationTimelineProps>(
 				? askUserQuestionResponseTextByToolId
 				: undefined;
 
+		const renderMessageEntry = (
+			{ message, parsed }: ParsedMessageEntry,
+			msgIdx: number,
+		): ReactNode => {
+			if (message.role === "user") {
+				return (
+					<StickyUserMessage
+						key={message.id}
+						message={message}
+						parsed={parsed}
+						onEditUserMessage={onEditUserMessage}
+						editingMessageId={editingMessageId}
+						isAfterEditingMessage={afterEditingMessageIds.has(message.id)}
+					/>
+				);
+			}
+			// Hide actions on assistant messages that are not the last in a
+			// consecutive assistant chain. computeLastInChainFlags precomputes
+			// these flags in a single reverse pass.
+			const isLastInChain = lastInChainFlags[msgIdx];
+			return (
+				<ChatMessageItem
+					key={message.id}
+					message={message}
+					parsed={parsed}
+					onImplementPlan={onImplementPlan}
+					onSendAskUserQuestionResponse={onSendAskUserQuestionResponse}
+					isChatCompleted={isChatCompleted}
+					latestAskUserQuestionToolId={latestAskUserQuestionToolId}
+					askUserQuestionResponseTextByToolId={
+						historicalAskUserQuestionResponseTextByToolId
+					}
+					hasUserResponseAfterAskQuestion={hasUserResponseAfterAskQuestion}
+					urlTransform={urlTransform}
+					isAfterEditingMessage={afterEditingMessageIds.has(message.id)}
+					hideActions={!isLastInChain}
+					mcpServers={mcpServers}
+					subagentTitles={subagentTitles}
+					subagentVariants={subagentVariants}
+					showDesktopPreviews={showDesktopPreviews}
+				/>
+			);
+		};
+
+		// Boundaries arrive deduped and sorted by (created_at, id) from
+		// AgentChatPage, matching the message ordering in parsedMessages
+		// (sorted by created_at). Boundaries that fall before the first
+		// loaded message render up-front so paginated chats still show
+		// the marker when only a recent slice of the chat is loaded.
+		// compareBoundaryPosition is shared with AgentChatPage to avoid
+		// divergence between sort key and placement key.
+		const timelineNodes: ReactNode[] = [];
+		let boundaryIndex = 0;
+		const firstMessage = parsedMessages.find((entry) => entry)?.message;
+		if (firstMessage) {
+			while (boundaryIndex < boundaries.length) {
+				const boundary = boundaries[boundaryIndex];
+				if (!boundary) {
+					boundaryIndex += 1;
+					continue;
+				}
+				if (compareBoundaryPosition(boundary, firstMessage) >= 0) {
+					break;
+				}
+				timelineNodes.push(
+					<ContextBoundaryDivider key={`context-boundary-${boundary.id}`} />,
+				);
+				boundaryIndex += 1;
+			}
+		}
+		for (
+			let messageIndex = 0;
+			messageIndex < parsedMessages.length;
+			messageIndex += 1
+		) {
+			const entry = parsedMessages[messageIndex];
+			if (!entry) {
+				continue;
+			}
+			const currentMessage = entry.message;
+			const nextMessage = parsedMessages[messageIndex + 1]?.message;
+			timelineNodes.push(renderMessageEntry(entry, messageIndex));
+			while (boundaryIndex < boundaries.length) {
+				const boundary = boundaries[boundaryIndex];
+				if (!boundary) {
+					boundaryIndex += 1;
+					continue;
+				}
+				if (compareBoundaryPosition(boundary, currentMessage) <= 0) {
+					boundaryIndex += 1;
+					continue;
+				}
+				if (
+					nextMessage &&
+					compareBoundaryPosition(boundary, nextMessage) >= 0
+				) {
+					break;
+				}
+				timelineNodes.push(
+					<ContextBoundaryDivider key={`context-boundary-${boundary.id}`} />,
+				);
+				boundaryIndex += 1;
+			}
+		}
+		// Drain any remaining boundaries. This is reachable when
+		// parsedMessages is empty (firstMessage is undefined and the
+		// per-message loop did not run). The per-message loop already
+		// drains boundaries that fall after the last loaded message
+		// because the break-on-nextMessage guard short-circuits.
+		while (boundaryIndex < boundaries.length) {
+			const boundary = boundaries[boundaryIndex];
+			if (boundary) {
+				timelineNodes.push(
+					<ContextBoundaryDivider key={`context-boundary-${boundary.id}`} />,
+				);
+			}
+			boundaryIndex += 1;
+		}
+
 		return (
 			<ExpiredFileIdsProvider>
 				<div
 					data-testid="conversation-timeline"
 					className="flex flex-col gap-2"
 				>
-					{parsedMessages.map(({ message, parsed }, msgIdx) => {
-						if (message.role === "user") {
-							return (
-								<StickyUserMessage
-									key={message.id}
-									message={message}
-									parsed={parsed}
-									onEditUserMessage={onEditUserMessage}
-									editingMessageId={editingMessageId}
-									isAfterEditingMessage={afterEditingMessageIds.has(message.id)}
-								/>
-							);
-						}
-						// Hide actions on assistant messages that are not the
-						// last in a consecutive assistant chain. Flags are
-						// precomputed in a single reverse pass above.
-						const isLastInChain = lastInChainFlags[msgIdx];
-						return (
-							<ChatMessageItem
-								key={message.id}
-								message={message}
-								parsed={parsed}
-								onImplementPlan={onImplementPlan}
-								onSendAskUserQuestionResponse={onSendAskUserQuestionResponse}
-								isChatCompleted={isChatCompleted}
-								latestAskUserQuestionToolId={latestAskUserQuestionToolId}
-								askUserQuestionResponseTextByToolId={
-									historicalAskUserQuestionResponseTextByToolId
-								}
-								hasUserResponseAfterAskQuestion={
-									hasUserResponseAfterAskQuestion
-								}
-								urlTransform={urlTransform}
-								isAfterEditingMessage={afterEditingMessageIds.has(message.id)}
-								hideActions={!isLastInChain}
-								mcpServers={mcpServers}
-								subagentTitles={subagentTitles}
-								subagentVariants={subagentVariants}
-								showDesktopPreviews={showDesktopPreviews}
-							/>
-						);
-					})}
+					{timelineNodes}
 				</div>
 			</ExpiredFileIdsProvider>
 		);

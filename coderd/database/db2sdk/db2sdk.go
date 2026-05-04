@@ -1464,6 +1464,14 @@ func jsonOrEmptyMap(rawMessage pqtype.NullRawMessage) map[string]any {
 	return m
 }
 
+func ChatContextBoundary(row database.GetChatContextBoundariesByChatIDRow) codersdk.ChatContextBoundary {
+	return codersdk.ChatContextBoundary{
+		ID:        row.ID,
+		ChatID:    row.ChatID,
+		CreatedAt: row.CreatedAt,
+	}
+}
+
 func ChatMessage(m database.ChatMessage) codersdk.ChatMessage {
 	modelConfigID := &m.ModelConfigID.UUID
 	if !m.ModelConfigID.Valid {

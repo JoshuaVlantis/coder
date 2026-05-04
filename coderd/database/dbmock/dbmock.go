@@ -2132,6 +2132,21 @@ func (mr *MockStoreMockRecorder) GetChatComputerUseProvider(ctx any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChatComputerUseProvider", reflect.TypeOf((*MockStore)(nil).GetChatComputerUseProvider), ctx)
 }
 
+// GetChatContextBoundariesByChatID mocks base method.
+func (m *MockStore) GetChatContextBoundariesByChatID(ctx context.Context, chatID uuid.UUID) ([]database.GetChatContextBoundariesByChatIDRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetChatContextBoundariesByChatID", ctx, chatID)
+	ret0, _ := ret[0].([]database.GetChatContextBoundariesByChatIDRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetChatContextBoundariesByChatID indicates an expected call of GetChatContextBoundariesByChatID.
+func (mr *MockStoreMockRecorder) GetChatContextBoundariesByChatID(ctx, chatID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetChatContextBoundariesByChatID", reflect.TypeOf((*MockStore)(nil).GetChatContextBoundariesByChatID), ctx, chatID)
+}
+
 // GetChatCostPerChat mocks base method.
 func (m *MockStore) GetChatCostPerChat(ctx context.Context, arg database.GetChatCostPerChatParams) ([]database.GetChatCostPerChatRow, error) {
 	m.ctrl.T.Helper()

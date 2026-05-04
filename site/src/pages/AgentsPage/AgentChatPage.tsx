@@ -21,6 +21,7 @@ import {
 	chatDesktopEnabled,
 	chatKey,
 	chatMessagesForInfiniteScroll,
+	chatMessagesKey,
 	chatModelConfigs,
 	chatModels,
 	createChatMessage,
@@ -59,6 +60,7 @@ import type { AgentsOutletContext } from "./AgentsPage";
 import type { ChatMessageInputRef } from "./components/AgentChatInput";
 import { normalizeChatErrorPayload } from "./components/ChatConversation/chatError";
 import {
+	compareBoundaryPosition,
 	getParentChatID,
 	getWorkspaceAgent,
 } from "./components/ChatConversation/chatHelpers";
@@ -102,7 +104,37 @@ export const draftInputStorageKeyPrefix = "agents.draft-input.";
 /** @internal localStorage key prefix for the per-chat active sidebar tab. Exported for testing. */
 export const lastActiveSidebarTabStorageKeyPrefix = "agents.last-active-tab.";
 
+const clearChatCommandName = "clear";
+const clearChatCommandToken = "/clear";
+
 const clearChatPlanMode = "" satisfies ChatPlanModeOrClear;
+
+export const getChatInputCommandName = (
+	content: readonly TypesGen.ChatInputPart[],
+): string | undefined => {
+	const firstPart = content[0];
+	if (firstPart?.type !== "text") {
+		return undefined;
+	}
+
+	const firstToken = firstPart.text?.trim()?.split(/\s+/, 1)[0];
+	if (firstToken === clearChatCommandToken) {
+		return clearChatCommandName;
+	}
+	return undefined;
+};
+
+const getChatCommandSuccessMessage = (
+	result: TypesGen.ChatCommandResult,
+): string => {
+	if (result.message) {
+		return result.message;
+	}
+	if (result.command === clearChatCommandName) {
+		return "Context cleared.";
+	}
+	return "Command completed.";
+};
 
 type PlanModeSwitch = TypesGen.ChatPlanMode | "clear";
 
@@ -853,6 +885,26 @@ const AgentChatPage: FC = () => {
 		return deduped;
 	})();
 
+	const chatContextBoundaries = (() => {
+		const pages = chatMessagesQuery.data?.pages;
+		if (!pages || pages.length === 0) return undefined;
+		const byID = new Map<number, TypesGen.ChatContextBoundary>();
+		for (const page of pages) {
+			for (const boundary of page.boundaries ?? []) {
+				byID.set(boundary.id, boundary);
+			}
+		}
+		const deduped = Array.from(byID.values());
+		// Sort by (created_at, id) so the order matches the chat message
+		// timeline, which is sorted by created_at. Chatd serializes
+		// inserts to a single chat via GetChatByIDForUpdate, so id and
+		// timestamp orders cannot diverge in practice; id is included as
+		// a stable secondary key for determinism if that invariant ever
+		// relaxes.
+		deduped.sort(compareBoundaryPosition);
+		return deduped;
+	})();
+
 	// Queued messages are only in the first page (most recent).
 	const chatQueuedMessages = chatMessagesQuery.data?.pages[0]?.queued_messages;
 
@@ -863,6 +915,7 @@ const AgentChatPage: FC = () => {
 			? {
 					messages: chatMessagesList,
 					queued_messages: chatQueuedMessages ?? [],
+					boundaries: chatContextBoundaries ?? [],
 					has_more: chatMessagesQuery.data?.pages.at(-1)?.has_more ?? false,
 				}
 			: undefined;
@@ -1076,7 +1129,7 @@ const AgentChatPage: FC = () => {
 		} else if (isApiError(error)) {
 			const reason: ChatDetailError = {
 				kind: "generic",
-				message: error.message || "An unexpected error occurred.",
+				message: getErrorMessage(error, "An unexpected error occurred."),
 			};
 			store.setStreamError(reason);
 			setChatErrorReason(agentId, reason);
@@ -1338,20 +1391,30 @@ const AgentChatPage: FC = () => {
 		}
 
 		const selectedModelConfigID = effectiveSelectedModel || undefined;
-		const request: CreateChatMessageRequestWithClearablePlanMode = {
-			content,
-			model_config_id: selectedModelConfigID,
-			mcp_server_ids:
-				effectiveMCPServerIds.length > 0
-					? [...effectiveMCPServerIds]
-					: undefined,
-			...(planModeSwitch !== undefined
-				? {
-						plan_mode:
-							planModeSwitch === "clear" ? clearChatPlanMode : planModeSwitch,
-					}
-				: {}),
-		};
+		const commandName = getChatInputCommandName(content);
+		// Slash commands like /clear ignore everything except the content
+		// text, and the backend rejects requests that try to attach extra
+		// options. Send only the content for commands so users do not see
+		// a 400 when the UI happens to have a model config or MCP servers
+		// selected.
+		const request: CreateChatMessageRequestWithClearablePlanMode = commandName
+			? { content }
+			: {
+					content,
+					model_config_id: selectedModelConfigID,
+					mcp_server_ids:
+						effectiveMCPServerIds.length > 0
+							? [...effectiveMCPServerIds]
+							: undefined,
+					...(planModeSwitch !== undefined
+						? {
+								plan_mode:
+									planModeSwitch === "clear"
+										? clearChatPlanMode
+										: planModeSwitch,
+							}
+						: {}),
+				};
 		clearChatErrorReason(agentId);
 		clearStreamError();
 		scrollToBottomRef.current?.();
@@ -1364,9 +1427,38 @@ const AgentChatPage: FC = () => {
 		try {
 			response = await sendMessage(request);
 		} catch (error) {
-			handleUsageLimitError(error);
+			const errorCommandName = isApiError(error)
+				? error.response.data.command || commandName
+				: commandName;
+			if (errorCommandName) {
+				toast.error(
+					getErrorMessage(error, `Failed to run /${errorCommandName}.`),
+				);
+			} else {
+				handleUsageLimitError(error);
+			}
 			throw error;
 		}
+		if (selectedModelConfigID) {
+			localStorage.setItem(lastModelConfigIDStorageKey, selectedModelConfigID);
+		} else {
+			localStorage.removeItem(lastModelConfigIDStorageKey);
+		}
+
+		if (response.command_result) {
+			store.clearStreamState();
+			void queryClient.invalidateQueries({
+				queryKey: chatKey(agentId),
+				exact: true,
+			});
+			void queryClient.invalidateQueries({
+				queryKey: chatMessagesKey(agentId),
+				exact: true,
+			});
+			toast.success(getChatCommandSuccessMessage(response.command_result));
+			return;
+		}
+
 		// When the server accepts the message immediately (not
 		// queued), clear the stream and insert the user's message
 		// so it appears in the timeline without waiting for the
@@ -1386,11 +1478,6 @@ const AgentChatPage: FC = () => {
 				store.upsertDurableMessage(response.message);
 				upsertCacheMessages([response.message]);
 			}
-		}
-		if (selectedModelConfigID) {
-			localStorage.setItem(lastModelConfigIDStorageKey, selectedModelConfigID);
-		} else {
-			localStorage.removeItem(lastModelConfigIDStorageKey);
 		}
 		if (planModeSwitch !== undefined) {
 			setCachedChatPlanMode(

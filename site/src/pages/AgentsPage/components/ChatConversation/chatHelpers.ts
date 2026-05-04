@@ -122,3 +122,21 @@ export const getWorkspaceAgent = (
 	}
 	return agents.find((agent) => agent.id === workspaceAgentId) ?? agents[0];
 };
+
+// compareBoundaryPosition orders chat context boundaries and chat
+// messages by (created_at, id) so the boundary divider is rendered
+// next to the right messages even when sequence id and timestamp
+// order would diverge. This is shared between AgentChatPage (which
+// sorts boundaries from infinite-query pages) and ConversationTimeline
+// (which interleaves boundaries with messages).
+export const compareBoundaryPosition = (
+	a: { id: number; created_at: string },
+	b: { id: number; created_at: string },
+): number => {
+	const aTime = new Date(a.created_at).getTime();
+	const bTime = new Date(b.created_at).getTime();
+	if (aTime !== bTime) {
+		return aTime - bTime;
+	}
+	return a.id - b.id;
+};

@@ -103,6 +103,21 @@ export const chatQueuedMessagesEqualByID = (
 	return true;
 };
 
+const chatContextBoundariesEqualByID = (
+	left: readonly TypesGen.ChatContextBoundary[],
+	right: readonly TypesGen.ChatContextBoundary[],
+): boolean => {
+	if (left.length !== right.length) {
+		return false;
+	}
+	for (let index = 0; index < left.length; index += 1) {
+		if (left[index]?.id !== right[index]?.id) {
+			return false;
+		}
+	}
+	return true;
+};
+
 const retryStatesEqual = (
 	left: RetryState | null,
 	right: RetryState | null,
@@ -153,6 +168,7 @@ export type ChatStoreState = {
 	retryState: RetryState | null;
 	reconnectState: ReconnectState | null;
 	queuedMessages: readonly TypesGen.ChatQueuedMessage[];
+	contextBoundaries: readonly TypesGen.ChatContextBoundary[];
 	subagentStatusOverrides: Map<string, TypesGen.ChatStatus>;
 };
 
@@ -172,6 +188,9 @@ export type ChatStore = {
 	applyMessageParts: (parts: readonly TypesGen.ChatMessagePart[]) => void;
 	setQueuedMessages: (
 		queuedMessages: readonly TypesGen.ChatQueuedMessage[] | undefined,
+	) => void;
+	setContextBoundaries: (
+		contextBoundaries: readonly TypesGen.ChatContextBoundary[] | undefined,
 	) => void;
 	setChatStatus: (status: TypesGen.ChatStatus | null) => void;
 	setStreamState: (streamState: StreamState | null) => void;
@@ -199,6 +218,7 @@ const createInitialState = (): ChatStoreState => ({
 	retryState: null,
 	reconnectState: null,
 	queuedMessages: [],
+	contextBoundaries: [],
 	subagentStatusOverrides: new Map(),
 });
 
@@ -404,6 +424,20 @@ export const createChatStore = (): ChatStore => {
 				return { ...current, queuedMessages: nextQueuedMessages };
 			});
 		},
+		setContextBoundaries: (contextBoundaries) => {
+			const nextContextBoundaries = contextBoundaries ?? [];
+			setState((current) => {
+				if (
+					chatContextBoundariesEqualByID(
+						current.contextBoundaries,
+						nextContextBoundaries,
+					)
+				) {
+					return current;
+				}
+				return { ...current, contextBoundaries: nextContextBoundaries };
+			});
+		},
 		setChatStatus: (status) => {
 			if (state.chatStatus === status) {
 				return;
@@ -556,6 +590,8 @@ export const selectChatStatus = (state: ChatStoreState) => state.chatStatus;
 export const selectStreamError = (state: ChatStoreState) => state.streamError;
 export const selectQueuedMessages = (state: ChatStoreState) =>
 	state.queuedMessages;
+export const selectContextBoundaries = (state: ChatStoreState) =>
+	state.contextBoundaries;
 export const selectSubagentStatusOverrides = (state: ChatStoreState) =>
 	state.subagentStatusOverrides;
 export const selectRetryState = (state: ChatStoreState) => state.retryState;

@@ -237,6 +237,7 @@ export const useChatStore = (
 		wsQueueUpdateReceivedRef.current = false;
 		wsStatusReceivedRef.current = false;
 		store.setQueuedMessages([]);
+		store.setContextBoundaries([]);
 		if (!chatID) {
 			return;
 		}
@@ -260,6 +261,13 @@ export const useChatStore = (
 		queuedMessagesHydratedChatIDRef.current = chatID;
 		store.setQueuedMessages(chatQueuedMessages);
 	}, [chatMessagesData, chatID, chatQueuedMessages, store]);
+
+	useEffect(() => {
+		if (!chatID || !chatMessagesData) {
+			return;
+		}
+		store.setContextBoundaries(chatMessagesData.boundaries);
+	}, [chatMessagesData, chatID, store]);
 
 	useEffect(() => {
 		const updateSidebarChat = (

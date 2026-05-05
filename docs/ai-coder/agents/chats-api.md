@@ -245,8 +245,17 @@ return a `Chat` object omit it.
 
 | Query parameter | Type     | Required | Description                                                      |
 |-----------------|----------|----------|------------------------------------------------------------------|
-| `q`             | `string` | no       | Search query string.                                             |
+| `q`             | `string` | no       | Search query string. See below for supported terms.              |
 | `label`         | `string` | no       | Filter by label as `key:value`. Repeat for multiple (AND logic). |
+
+The `q` parameter accepts a space-separated list of `key:value` terms.
+Values containing `:`, `?`, or other URL characters must be quoted.
+Supported keys:
+
+| Key        | Value                                                                                                                                                                                                                              |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `archived` | `true`, `false`. Defaults to `false`.                                                                                                                                                                                              |
+| `diff_url` | Match chats whose linked diff URL equals the given value, case-insensitively. The URL may live on a delegated sub-agent's diff status; the parent chat is returned. Example: `q=diff_url:"https://github.com/coder/coder/pull/1"`. |
 
 ### Get a chat
 

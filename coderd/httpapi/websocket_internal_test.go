@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	promtestutil "github.com/prometheus/client_golang/prometheus/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -63,6 +65,10 @@ func TestHeartbeatClose(t *testing.T) {
 		sink := testutil.NewFakeSink(t)
 		logger := sink.Logger()
 		mClock := quartz.NewMock(t)
+		reg := prometheus.NewRegistry()
+		metrics := NewWebsocketMetrics(reg, func(ctx context.Context) string {
+			return "/test/path"
+		})
 
 		// Trap ticker creation so we can synchronize startup.
 		trap := mClock.Trap().NewTicker("HeartbeatClose")
@@ -71,7 +77,7 @@ func TestHeartbeatClose(t *testing.T) {
 		serverConn := websocketPair(ctx, t)
 		exitCalled := make(chan struct{})
 
-		go heartbeatCloseWith(ctx, logger, func() {
+		go heartbeatCloseWith(ctx, logger, metrics.Heartbeat, func() {
 			close(exitCalled)
 		}, serverConn, mClock, time.Second)
 
@@ -100,6 +106,7 @@ func TestHeartbeatClose(t *testing.T) {
 		debugEntries := sink.Entries(func(e slog.SinkEntry) bool { return e.Level == slog.LevelDebug })
 		assert.NotEmpty(t, debugEntries,
 			"expected a debug-level log entry for the closed connection")
+		assert.Zero(t, promtestutil.ToFloat64(metrics.heartbeats.WithLabelValues("/test/path")), "expected no heartbeat attempts")
 	})
 
 	t.Run("ContextCanceled", func(t *testing.T) {
@@ -109,6 +116,10 @@ func TestHeartbeatClose(t *testing.T) {
 		sink := testutil.NewFakeSink(t)
 		logger := sink.Logger()
 		mClock := quartz.NewMock(t)
+		reg := prometheus.NewRegistry()
+		metrics := NewWebsocketMetrics(reg, func(ctx context.Context) string {
+			return "/test/path"
+		})
 
 		trap := mClock.Trap().NewTicker("HeartbeatClose")
 		defer trap.Close()
@@ -119,7 +130,7 @@ func TestHeartbeatClose(t *testing.T) {
 
 		go func() {
 			defer close(done)
-			heartbeatCloseWith(serverCtx, logger, func() {
+			heartbeatCloseWith(serverCtx, logger, metrics.Heartbeat, func() {
 				t.Error("exit should not be called on context cancel")
 			}, serverConn, mClock, time.Second)
 		}()
@@ -139,6 +150,7 @@ func TestHeartbeatClose(t *testing.T) {
 		errorEntries := sink.Entries(func(e slog.SinkEntry) bool { return e.Level == slog.LevelError })
 		assert.Empty(t, errorEntries,
 			"context cancellation should not produce error-level logs, got: %+v", errorEntries)
+		assert.Zero(t, promtestutil.ToFloat64(metrics.heartbeats.WithLabelValues("/test/path")), "expected no heartbeat attempts")
 	})
 
 	t.Run("PingSucceeds", func(t *testing.T) {
@@ -148,6 +160,10 @@ func TestHeartbeatClose(t *testing.T) {
 		sink := testutil.NewFakeSink(t)
 		logger := sink.Logger()
 		mClock := quartz.NewMock(t)
+		reg := prometheus.NewRegistry()
+		metrics := NewWebsocketMetrics(reg, func(ctx context.Context) string {
+			return "/test/path"
+		})
 
 		trap := mClock.Trap().NewTicker("HeartbeatClose")
 		defer trap.Close()
@@ -155,23 +171,26 @@ func TestHeartbeatClose(t *testing.T) {
 		serverConn := websocketPair(ctx, t)
 		exitCalled := make(chan struct{}, 1)
 
-		go heartbeatCloseWith(ctx, logger, func() {
+		go heartbeatCloseWith(ctx, logger, metrics.Heartbeat, func() {
 			exitCalled <- struct{}{}
 		}, serverConn, mClock, time.Second)
 
 		trap.MustWait(ctx).MustRelease(ctx)
 
 		// Fire several ticks — pings should succeed each time.
-		for range 3 {
+		for i := range 3 {
 			mClock.Advance(time.Second).MustWait(ctx)
 
 			// Give the ping round-trip time to complete.
 			// If exit were called, we'd catch it.
-			select {
-			case <-exitCalled:
-				t.Fatal("exit should not be called when pings succeed")
-			default:
-			}
+			testutil.Eventually(ctx, t, func(context.Context) bool {
+				select {
+				case <-exitCalled:
+					t.Fatal("exit should not be called when pings succeed")
+				default:
+				}
+				return promtestutil.ToFloat64(metrics.heartbeats.WithLabelValues("/test/path")) >= float64(i+1)
+			}, testutil.IntervalFast, "heartbeat counter not incremented at tick %d", i+1)
 		}
 
 		// No logs should be emitted during normal operation.
@@ -181,5 +200,6 @@ func TestHeartbeatClose(t *testing.T) {
 		debugEntries := sink.Entries(func(e slog.SinkEntry) bool { return e.Level == slog.LevelDebug })
 		assert.Empty(t, debugEntries,
 			"successful pings should not produce debug-level logs, got: %+v", debugEntries)
+		assert.Equal(t, float64(3), promtestutil.ToFloat64(metrics.heartbeats.WithLabelValues("/test/path")))
 	})
 }

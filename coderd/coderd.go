@@ -823,6 +823,7 @@ func New(options *Options) *API {
 	if options.DeploymentValues.Prometheus.Enable {
 		options.PrometheusRegistry.MustRegister(stn)
 		api.lifecycleMetrics = agentapi.NewLifecycleMetrics(options.PrometheusRegistry)
+		api.websocketMetrics = httpapi.NewWebsocketMetrics(options.PrometheusRegistry, httpmw.ExtractHTTPRoute)
 	}
 	api.NetworkTelemetryBatcher = tailnet.NewNetworkTelemetryBatcher(
 		quartz.NewReal(),
@@ -895,6 +896,7 @@ func New(options *Options) *API {
 		SignedTokenProvider: api.WorkspaceAppsProvider,
 		AgentProvider:       api.agentProvider,
 		StatsCollector:      workspaceapps.NewStatsCollector(options.WorkspaceAppsStatsCollectorOptions),
+		WebsocketMetrics:    api.websocketMetrics,
 
 		DisablePathApps:          options.DeploymentValues.DisablePathApps.Value(),
 		CookiesConfig:            options.DeploymentValues.HTTPCookies,
@@ -2166,6 +2168,7 @@ type API struct {
 	statsReporter    *workspacestats.Reporter
 	metadataBatcher  *metadatabatcher.Batcher
 	lifecycleMetrics *agentapi.LifecycleMetrics
+	websocketMetrics *httpapi.WebsocketMetrics
 
 	Acquirer *provisionerdserver.Acquirer
 	// dbRolluper rolls up template usage stats from raw agent and app

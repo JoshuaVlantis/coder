@@ -759,6 +759,12 @@ BEGIN
 		-- email if the account is undeleted. Although that is not a guarantee.
 		DELETE FROM user_links
 		WHERE user_id = OLD.id;
+
+		-- Remove their user_secrets.
+		-- user_secrets.user_id has ON DELETE CASCADE, but soft-delete
+		-- does not remove the users row so the FK cascade never fires.
+		DELETE FROM user_secrets
+		WHERE user_id = OLD.id;
 	END IF;
 	RETURN NEW;
 END;
@@ -879,6 +885,21 @@ BEGIN
 	IF (NEW.user_id IS NOT NULL) THEN
 		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
 			RAISE EXCEPTION 'Cannot create user_link for deleted user';
+		END IF;
+	END IF;
+	RETURN NEW;
+END;
+$$;
+
+CREATE FUNCTION insert_user_secret_fail_if_user_deleted() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+
+DECLARE
+BEGIN
+	IF (NEW.user_id IS NOT NULL) THEN
+		IF (SELECT deleted FROM users WHERE id = NEW.user_id LIMIT 1) THEN
+			RAISE EXCEPTION 'Cannot create user_secret for deleted user';
 		END IF;
 	END IF;
 	RETURN NEW;
@@ -4081,6 +4102,8 @@ CREATE TRIGGER trigger_nullify_next_start_at_on_workspace_autostart_modificati A
 CREATE TRIGGER trigger_update_users AFTER INSERT OR UPDATE ON users FOR EACH ROW WHEN ((new.deleted = true)) EXECUTE FUNCTION delete_deleted_user_resources();
 
 CREATE TRIGGER trigger_upsert_user_links BEFORE INSERT OR UPDATE ON user_links FOR EACH ROW EXECUTE FUNCTION insert_user_links_fail_if_user_deleted();
+
+CREATE TRIGGER trigger_upsert_user_secrets BEFORE INSERT OR UPDATE ON user_secrets FOR EACH ROW EXECUTE FUNCTION insert_user_secret_fail_if_user_deleted();
 
 CREATE TRIGGER update_notification_message_dedupe_hash BEFORE INSERT OR UPDATE ON notification_messages FOR EACH ROW EXECUTE FUNCTION compute_notification_message_dedupe_hash();
 

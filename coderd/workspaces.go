@@ -25,6 +25,8 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/database/dbtime"
 	"github.com/coder/coder/v2/coderd/database/provisionerjobs"
+	"github.com/coder/coder/v2/coderd/dynamicparameters"
+	"github.com/coder/coder/v2/coderd/files"
 	"github.com/coder/coder/v2/coderd/httpapi"
 	"github.com/coder/coder/v2/coderd/httpapi/httperror"
 	"github.com/coder/coder/v2/coderd/httpmw"
@@ -1918,6 +1920,41 @@ func (api *API) putWorkspaceAutoupdates(rw http.ResponseWriter, r *http.Request)
 	rw.WriteHeader(http.StatusNoContent)
 }
 
+// evaluateSecretMismatch reports whether the active template version
+// declares coder_secret requirements that the workspace owner's secrets
+// do not satisfy. Returns false (no mismatch) when the renderer cannot
+// authoritatively evaluate the requirements (forbidden caller,
+// owner-secrets fetch failure). Returns
+// dynamicparameters.ErrTemplateVersionNotReady when the active
+// version's provisioner job has not yet completed; callers should
+// treat that as "unknown" and leave SecretMismatch false.
+func evaluateSecretMismatch(
+	ctx context.Context,
+	db database.Store,
+	cache files.FileAcquirer,
+	version database.TemplateVersion,
+	ownerID uuid.UUID,
+	buildParams []database.WorkspaceBuildParameter,
+) (bool, error) {
+	paramValues := make(map[string]string, len(buildParams))
+	for _, p := range buildParams {
+		paramValues[p.Name] = p.Value
+	}
+	renderer, err := dynamicparameters.Prepare(ctx, db, cache, version.ID,
+		dynamicparameters.WithTemplateVersion(version))
+	if err != nil {
+		return false, err
+	}
+	defer renderer.Close()
+
+	result, diags := renderer.Render(ctx, ownerID, paramValues, dynamicparameters.IncludeSecretRequirements())
+	if result == nil || dynamicparameters.HasSecretValidationDiagnostic(diags) {
+		return false, nil
+	}
+	return slices.ContainsFunc(result.SecretRequirements,
+		func(s codersdk.SecretRequirementStatus) bool { return !s.Satisfied }), nil
+}
+
 // @Summary Resolve workspace autostart by id.
 // @ID resolve-workspace-autostart-by-id
 // @Security CoderSessionToken
@@ -2009,6 +2046,26 @@ func (api *API) resolveAutostart(rw http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+
+	// Surface whether the active template version declares coder_secret
+	// requirements that the workspace owner's secrets do not satisfy. The
+	// intention is for this information to inform the workspace update
+	// requirement so the user knows autostart will not run an auto-update
+	// build until the missing secrets are satisfied.
+	//
+	// Callers without user_secret:read on the workspace owner produce a
+	// forbidden warning diagnostic. This is treated as "unknown" and
+	// no mismatch is reported rather than returning a partial answer.
+	secretMismatch, err := evaluateSecretMismatch(ctx, api.Database, api.FileCache, version, workspace.OwnerID, dbBuildParams)
+	if err != nil && !xerrors.Is(err, dynamicparameters.ErrTemplateVersionNotReady) {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Internal error evaluating template secret requirements.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	response.SecretMismatch = secretMismatch
+
 	httpapi.Write(ctx, rw, http.StatusOK, response)
 }
 

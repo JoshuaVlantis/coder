@@ -649,6 +649,71 @@ func TestDynamicParametersWithTerraformValues(t *testing.T) {
 	})
 }
 
+// TestResolveAutostartSecretRequirements is the PLAT-81 backend coverage:
+// resolve-autostart must surface coder_secret requirements declared by the
+// active template version that the workspace owner's secrets do not
+// satisfy. The dashboard banner uses this to tell the user autostart
+// cannot run the auto-update build until they create the missing secrets.
+func TestResolveAutostartSecretRequirements(t *testing.T) {
+	t.Parallel()
+
+	noRequirementsTF := []byte(`terraform {
+  required_providers {
+    coder = {
+      source = "coder/coder"
+    }
+  }
+}
+`)
+	secretRequiredTF, err := os.ReadFile("testdata/parameters/secret_required/main.tf")
+	require.NoError(t, err)
+
+	// v1 has no secret requirements; we need a workspace to exist so
+	// resolve-autostart enters its version-mismatch branch.
+	setup := setupDynamicParamsTest(t, setupDynamicParamsTestParams{
+		provisionerDaemonVersion: provProto.CurrentVersion.String(),
+		mainTF:                   noRequirementsTF,
+	})
+	_ = setup.stream.Close(websocket.StatusGoingAway)
+
+	ctx := testutil.Context(t, testutil.WaitLong)
+
+	wrk := coderdtest.CreateWorkspace(t, setup.client, setup.template.ID,
+		func(req *codersdk.CreateWorkspaceRequest) {
+			req.AutomaticUpdates = codersdk.AutomaticUpdatesAlways
+		})
+	coderdtest.AwaitWorkspaceBuildJobCompleted(t, setup.client, wrk.LatestBuild.ID)
+
+	// Push v2 with a coder_secret requirement and make it active.
+	_, _ = coderdtest.DynamicParameterTemplate(t, setup.dynamicParamsClient,
+		wrk.OrganizationID,
+		coderdtest.DynamicParameterTemplateParams{
+			MainTF:     string(secretRequiredTF),
+			TemplateID: setup.template.ID,
+		})
+
+	// Owner has no GITHUB_TOKEN secret; resolve-autostart must surface
+	// the unsatisfied requirement.
+	resp, err := setup.client.ResolveAutostart(ctx, wrk.ID.String())
+	require.NoError(t, err)
+	require.False(t, resp.ParameterMismatch)
+	require.True(t, resp.SecretMismatch)
+
+	// Creating the matching secret must clear the entry without further
+	// template changes.
+	_, err = setup.client.CreateUserSecret(ctx, codersdk.Me, codersdk.CreateUserSecretRequest{
+		Name:    "github-token",
+		Value:   "ghp_test",
+		EnvName: "GITHUB_TOKEN",
+	})
+	require.NoError(t, err)
+
+	resp, err = setup.client.ResolveAutostart(ctx, wrk.ID.String())
+	require.NoError(t, err)
+	require.False(t, resp.ParameterMismatch)
+	require.False(t, resp.SecretMismatch)
+}
+
 type setupDynamicParamsTestParams struct {
 	db                       database.Store
 	ps                       pubsub.Pubsub

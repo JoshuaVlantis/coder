@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"io/fs"
+	"slices"
 	"sync"
 	"time"
 
@@ -67,6 +68,20 @@ const (
 	DiagCodeOwnerSecretsFetchFailed   = "owner_secrets_fetch_failed"
 	DiagCodeSecretValidationForbidden = "secret_validation_forbidden"
 )
+
+// HasSecretValidationDiagnostic reports whether the given diagnostics
+// contain a marker that secret-requirement evaluation could not be
+// performed.
+func HasSecretValidationDiagnostic(diags hcl.Diagnostics) bool {
+	return slices.ContainsFunc(diags, func(d *hcl.Diagnostic) bool {
+		extra, ok := d.Extra.(previewtypes.DiagnosticExtra)
+		if !ok {
+			return false
+		}
+		return extra.Code == DiagCodeSecretValidationForbidden ||
+			extra.Code == DiagCodeOwnerSecretsFetchFailed
+	})
+}
 
 // loader is used to load the necessary coder objects for rendering a template
 // version's parameters. The output is a Renderer, which is the object that uses

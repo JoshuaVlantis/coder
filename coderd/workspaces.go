@@ -25,6 +25,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/database/dbtime"
 	"github.com/coder/coder/v2/coderd/database/provisionerjobs"
+	"github.com/coder/coder/v2/coderd/dynamicparameters"
 	"github.com/coder/coder/v2/coderd/httpapi"
 	"github.com/coder/coder/v2/coderd/httpapi/httperror"
 	"github.com/coder/coder/v2/coderd/httpmw"
@@ -2009,6 +2010,47 @@ func (api *API) resolveAutostart(rw http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+
+	// Surface whether the active template version declares coder_secret
+	// requirements that the workspace owner's secrets do not satisfy. The
+	// dashboard uses this alongside ParameterMismatch to render the
+	// "Update required" banner so the user knows autostart will not run an
+	// auto-update build until the missing secrets are created. The specific
+	// missing requirements are surfaced through the dynamic parameters flow
+	// when the user opens the Update workspace form.
+	//
+	// Callers without user_secret:read on the workspace owner produce a
+	// forbidden warning diagnostic; we treat that as "unknown" and leave
+	// SecretMismatch false rather than returning a partial answer.
+	paramValues := make(map[string]string, len(dbBuildParams))
+	for _, p := range dbBuildParams {
+		paramValues[p.Name] = p.Value
+	}
+	statuses, diags, err := dynamicparameters.CheckSecretRequirements(
+		ctx, api.Database, api.FileCache, version.ID, workspace.OwnerID, paramValues,
+		dynamicparameters.WithTemplateVersion(version),
+	)
+	switch {
+	case err == nil:
+		if !dynamicparameters.HasSecretValidationDiagnostic(diags) {
+			response.SecretMismatch = slices.ContainsFunc(statuses,
+				func(s codersdk.SecretRequirementStatus) bool {
+					return !s.Satisfied
+				})
+		}
+	case xerrors.Is(err, dynamicparameters.ErrTemplateVersionNotReady):
+		// The active version's provisioner job hasn't completed yet, so
+		// we can't evaluate secret requirements. Treat as "unknown" and
+		// leave SecretMismatch false; the dashboard will re-poll when
+		// the active version is ready.
+	default:
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Internal error evaluating template secret requirements.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+
 	httpapi.Write(ctx, rw, http.StatusOK, response)
 }
 

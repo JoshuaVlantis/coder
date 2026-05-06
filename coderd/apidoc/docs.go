@@ -21501,6 +21501,10 @@ const docTemplate = `{
             "properties": {
                 "parameter_mismatch": {
                     "type": "boolean"
+                },
+                "secret_mismatch": {
+                    "description": "SecretMismatch is true when the active template version declares\n` + "`" + `coder_secret` + "`" + ` requirements that the workspace owner's secrets do not\nsatisfy. When true, autostart will not run an auto-update build until\nthe user creates the missing secrets. The dashboard surfaces this\nalongside ParameterMismatch on the \"Update required\" banner; the\nspecific missing requirements are surfaced through the dynamic\nparameters flow when the user opens the Update workspace form.",
+                    "type": "boolean"
                 }
             }
         },

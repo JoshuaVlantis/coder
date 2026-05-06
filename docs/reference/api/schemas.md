@@ -10555,15 +10555,17 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
 
 ```json
 {
-  "parameter_mismatch": true
+  "parameter_mismatch": true,
+  "secret_mismatch": true
 }
 ```
 
 ### Properties
 
-| Name                 | Type    | Required | Restrictions | Description |
-|----------------------|---------|----------|--------------|-------------|
-| `parameter_mismatch` | boolean | false    |              |             |
+| Name                 | Type    | Required | Restrictions | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+|----------------------|---------|----------|--------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `parameter_mismatch` | boolean | false    |              |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `secret_mismatch`    | boolean | false    |              | Secret mismatch is true when the active template version declares `coder_secret` requirements that the workspace owner's secrets do not satisfy. When true, autostart will not run an auto-update build until the user creates the missing secrets. The dashboard surfaces this alongside ParameterMismatch on the "Update required" banner; the specific missing requirements are surfaced through the dynamic parameters flow when the user opens the Update workspace form. |
 
 ## codersdk.ResourceType
 

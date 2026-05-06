@@ -680,6 +680,14 @@ func (c *Client) WorkspaceQuota(ctx context.Context, organizationID string, user
 
 type ResolveAutostartResponse struct {
 	ParameterMismatch bool `json:"parameter_mismatch"`
+	// SecretMismatch is true when the active template version declares
+	// `coder_secret` requirements that the workspace owner's secrets do not
+	// satisfy. When true, autostart will not run an auto-update build until
+	// the user creates the missing secrets. The dashboard surfaces this
+	// alongside ParameterMismatch on the "Update required" banner; the
+	// specific missing requirements are surfaced through the dynamic
+	// parameters flow when the user opens the Update workspace form.
+	SecretMismatch bool `json:"secret_mismatch"`
 }
 
 func (c *Client) ResolveAutostart(ctx context.Context, workspaceID string) (ResolveAutostartResponse, error) {

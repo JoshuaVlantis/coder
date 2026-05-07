@@ -2076,7 +2076,10 @@ export interface ChatModelGoogleThinkingConfig {
  */
 export interface ChatModelOpenAICompatProviderOptions {
 	readonly user?: string;
+	readonly parallel_tool_calls?: boolean;
 	readonly reasoning_effort?: string;
+	readonly max_completion_tokens?: number;
+	readonly prompt_cache_key?: string;
 }
 
 // From codersdk/chats.go

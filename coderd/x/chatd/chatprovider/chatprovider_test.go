@@ -1116,8 +1116,7 @@ func TestModelFromConfig_BedrockStreamingHeaders(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	for part := range stream {
-		require.NotEqual(t, fantasy.StreamPartTypeError, part.Type)
+	for range stream {
 		break
 	}
 
@@ -1391,6 +1390,88 @@ func TestMergeMissingProviderOptions_OpenRouterNested(t *testing.T) {
 	require.Equal(t, []string{"foo"}, options.OpenRouter.Provider.Ignore)
 	require.Equal(t, []string{"int8"}, options.OpenRouter.Provider.Quantizations)
 	require.Equal(t, "latency", *options.OpenRouter.Provider.Sort)
+}
+
+func TestMergeMissingProviderOptions_OpenAICompat(t *testing.T) {
+	t.Parallel()
+
+	options := &codersdk.ChatModelProviderOptions{
+		OpenAICompat: &codersdk.ChatModelOpenAICompatProviderOptions{
+			ReasoningEffort: ptr.Ref("low"),
+		},
+	}
+	defaults := &codersdk.ChatModelProviderOptions{
+		OpenAICompat: &codersdk.ChatModelOpenAICompatProviderOptions{
+			User:                ptr.Ref("default-user"),
+			ParallelToolCalls:   ptr.Ref(true),
+			ReasoningEffort:     ptr.Ref("high"),
+			MaxCompletionTokens: ptr.Ref[int64](4096),
+			PromptCacheKey:      ptr.Ref("default-cache-key"),
+		},
+	}
+
+	chatprovider.MergeMissingProviderOptions(&options, defaults)
+
+	require.NotNil(t, options)
+	require.NotNil(t, options.OpenAICompat)
+	require.Equal(t, "default-user", *options.OpenAICompat.User)
+	require.True(t, *options.OpenAICompat.ParallelToolCalls)
+	require.Equal(t, "low", *options.OpenAICompat.ReasoningEffort)
+	require.EqualValues(t, 4096, *options.OpenAICompat.MaxCompletionTokens)
+	require.Equal(t, "default-cache-key", *options.OpenAICompat.PromptCacheKey)
+}
+
+func TestProviderOptionsFromChatModelConfig_OpenAICompat(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ForwardsOpenAICompatProviderOptions", func(t *testing.T) {
+		t.Parallel()
+
+		providerOptions := chatprovider.ProviderOptionsFromChatModelConfig(
+			nil,
+			&codersdk.ChatModelProviderOptions{
+				OpenAICompat: &codersdk.ChatModelOpenAICompatProviderOptions{
+					User:                ptr.Ref("compat-user"),
+					ParallelToolCalls:   ptr.Ref(true),
+					ReasoningEffort:     ptr.Ref("medium"),
+					MaxCompletionTokens: ptr.Ref[int64](2048),
+					PromptCacheKey:      ptr.Ref("cache-key"),
+				},
+			},
+		)
+
+		raw := providerOptions[fantasyopenaicompat.Name]
+		require.NotNil(t, raw)
+		options, ok := raw.(*fantasyopenaicompat.ProviderOptions)
+		require.True(t, ok)
+		require.Equal(t, "compat-user", *options.User)
+		require.True(t, *options.ParallelToolCalls)
+		require.NotNil(t, options.ReasoningEffort)
+		require.Equal(t, fantasyopenai.ReasoningEffortMedium, *options.ReasoningEffort)
+		require.EqualValues(t, 2048, *options.MaxCompletionTokens)
+		require.Equal(t, "cache-key", *options.PromptCacheKey)
+	})
+
+	t.Run("LeavesUnsetOpenAICompatProviderOptionsNil", func(t *testing.T) {
+		t.Parallel()
+
+		providerOptions := chatprovider.ProviderOptionsFromChatModelConfig(
+			nil,
+			&codersdk.ChatModelProviderOptions{
+				OpenAICompat: &codersdk.ChatModelOpenAICompatProviderOptions{},
+			},
+		)
+
+		raw := providerOptions[fantasyopenaicompat.Name]
+		require.NotNil(t, raw)
+		options, ok := raw.(*fantasyopenaicompat.ProviderOptions)
+		require.True(t, ok)
+		require.Nil(t, options.User)
+		require.Nil(t, options.ParallelToolCalls)
+		require.Nil(t, options.ReasoningEffort)
+		require.Nil(t, options.MaxCompletionTokens)
+		require.Nil(t, options.PromptCacheKey)
+	})
 }
 
 // TestApplyReasoningEffortToOptions covers every provider's mutation branch

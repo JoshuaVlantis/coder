@@ -812,6 +812,8 @@ func (q *sqlQuerier) GetAuthorizedChats(ctx context.Context, arg GetChatsParams,
 			&i.Chat.LastTurnSummary,
 			&i.Chat.UserACL,
 			&i.Chat.GroupACL,
+			&i.OwnerUsername,
+			&i.OwnerName,
 			&i.HasUnread); err != nil {
 			return nil, err
 		}
@@ -838,8 +840,55 @@ func (q *sqlQuerier) GetAuthorizedChatsByChatFileID(ctx context.Context, fileID 
 	}
 
 	query := fmt.Sprintf("-- name: GetAuthorizedChatsByChatFileID :many\n%s", filtered)
+	rows, err := q.db.QueryContext(ctx, query, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
 	var items []Chat
-	if err := q.db.SelectContext(ctx, &items, query, fileID); err != nil {
+	for rows.Next() {
+		var i Chat
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.WorkspaceID,
+			&i.Title,
+			&i.Status,
+			&i.WorkerID,
+			&i.StartedAt,
+			&i.HeartbeatAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ParentChatID,
+			&i.RootChatID,
+			&i.LastModelConfigID,
+			&i.Archived,
+			&i.LastError,
+			&i.Mode,
+			pq.Array(&i.MCPServerIDs),
+			&i.Labels,
+			&i.BuildID,
+			&i.AgentID,
+			&i.PinOrder,
+			&i.LastReadMessageID,
+			&i.LastInjectedContext,
+			&i.DynamicTools,
+			&i.OrganizationID,
+			&i.PlanMode,
+			&i.ClientType,
+			&i.LastTurnSummary,
+			&i.UserACL,
+			&i.GroupACL,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 	return items, nil

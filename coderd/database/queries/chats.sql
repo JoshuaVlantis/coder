@@ -359,6 +359,8 @@ ORDER BY
 -- name: GetChats :many
 SELECT
     sqlc.embed(chats),
+    users.username AS owner_username,
+    users.name AS owner_name,
     EXISTS (
         SELECT 1 FROM chat_messages cm
         WHERE cm.chat_id = chats.id
@@ -368,6 +370,7 @@ SELECT
     ) AS has_unread
 FROM
     chats
+    JOIN users ON users.id = chats.owner_id
 WHERE
     CASE
         WHEN @owned_only::boolean THEN chats.owner_id = @viewer_id::uuid
@@ -387,7 +390,7 @@ WHERE
         -- (pin_order is negated so lower values sort first in DESC order),
         -- which lets us use a single tuple < comparison.
         WHEN @after_id :: uuid != '00000000-0000-0000-0000-000000000000'::uuid THEN (
-            (CASE WHEN pin_order > 0 THEN 1 ELSE 0 END, -pin_order, updated_at, id) < (
+            (CASE WHEN chats.pin_order > 0 THEN 1 ELSE 0 END, -chats.pin_order, chats.updated_at, chats.id) < (
                 SELECT
                     CASE WHEN c2.pin_order > 0 THEN 1 ELSE 0 END, -c2.pin_order, c2.updated_at, c2.id
                 FROM
@@ -414,10 +417,10 @@ ORDER BY
     -- pinned chats, lower pin_order values come first. The negation
     -- trick (-pin_order) keeps all sort columns DESC so the cursor
     -- tuple < comparison works with uniform direction.
-    CASE WHEN pin_order > 0 THEN 1 ELSE 0 END DESC,
-    -pin_order DESC,
-    updated_at DESC,
-    id DESC
+    CASE WHEN chats.pin_order > 0 THEN 1 ELSE 0 END DESC,
+    -chats.pin_order DESC,
+    chats.updated_at DESC,
+    chats.id DESC
 OFFSET @offset_opt
 LIMIT
     -- The chat list is unbounded and expected to grow large.
@@ -434,6 +437,8 @@ WITH chats AS (
 )
 SELECT
     sqlc.embed(chats),
+    users.username AS owner_username,
+    users.name AS owner_name,
     EXISTS (
         SELECT 1 FROM chat_messages cm
         WHERE cm.chat_id = chats.id
@@ -443,6 +448,7 @@ SELECT
     ) AS has_unread
 FROM
     chats
+    JOIN users ON users.id = chats.owner_id
 WHERE
     chats.parent_chat_id = ANY(@parent_ids :: uuid[])
     AND CASE

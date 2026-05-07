@@ -901,6 +901,13 @@ func WorkspaceRoleActions(role codersdk.WorkspaceRole) []policy.Action {
 	return []policy.Action{}
 }
 
+func ChatRoleActions(role codersdk.ChatRole) []policy.Action {
+	if role == codersdk.ChatRoleRead {
+		return []policy.Action{policy.ActionRead}
+	}
+	return []policy.Action{}
+}
+
 func ConnectionLogConnectionTypeFromAgentProtoConnectionType(typ agentproto.Connection_Type) (database.ConnectionType, error) {
 	switch typ {
 	case agentproto.Connection_SSH:
@@ -1733,6 +1740,21 @@ func Chat(c database.Chat, diffStatus *database.ChatDiffStatus, files []database
 	return chat
 }
 
+// ChatWithOwner carries the owner identity that shared chat viewers cannot
+// reliably fetch through the users API.
+func ChatWithOwner(
+	c database.Chat,
+	ownerUsername string,
+	ownerName string,
+	diffStatus *database.ChatDiffStatus,
+	files []database.GetChatFileMetadataByChatIDRow,
+) codersdk.Chat {
+	chat := Chat(c, diffStatus, files)
+	chat.OwnerUsername = ownerUsername
+	chat.OwnerName = ownerName
+	return chat
+}
+
 func chatDebugAttempts(raw json.RawMessage) []map[string]any {
 	if len(raw) == 0 {
 		return nil
@@ -1867,9 +1889,9 @@ func ChildChatRows(
 	for i, row := range children {
 		diffStatus, ok := diffStatuses[row.Chat.ID]
 		if ok {
-			result[i] = Chat(row.Chat, &diffStatus, nil)
+			result[i] = ChatWithOwner(row.Chat, row.OwnerUsername, row.OwnerName, &diffStatus, nil)
 		} else {
-			result[i] = Chat(row.Chat, nil, nil)
+			result[i] = ChatWithOwner(row.Chat, row.OwnerUsername, row.OwnerName, nil, nil)
 			if diffStatuses != nil {
 				emptyDiffStatus := ChatDiffStatus(row.Chat.ID, nil)
 				result[i].DiffStatus = &emptyDiffStatus
@@ -1899,9 +1921,9 @@ func ChatRowsWithChildren(
 	for i, row := range roots {
 		diffStatus, ok := diffStatuses[row.Chat.ID]
 		if ok {
-			result[i] = Chat(row.Chat, &diffStatus, nil)
+			result[i] = ChatWithOwner(row.Chat, row.OwnerUsername, row.OwnerName, &diffStatus, nil)
 		} else {
-			result[i] = Chat(row.Chat, nil, nil)
+			result[i] = ChatWithOwner(row.Chat, row.OwnerUsername, row.OwnerName, nil, nil)
 			if diffStatuses != nil {
 				emptyDiffStatus := ChatDiffStatus(row.Chat.ID, nil)
 				result[i].DiffStatus = &emptyDiffStatus

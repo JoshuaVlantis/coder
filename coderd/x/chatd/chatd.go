@@ -32,6 +32,7 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbauthz"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
 	coderdpubsub "github.com/coder/coder/v2/coderd/pubsub"
+	"github.com/coder/coder/v2/coderd/rbac"
 	"github.com/coder/coder/v2/coderd/util/ptr"
 	"github.com/coder/coder/v2/coderd/util/xjson"
 	"github.com/coder/coder/v2/coderd/webpush"
@@ -49,6 +50,7 @@ import (
 	"github.com/coder/coder/v2/coderd/x/chatd/chattool"
 	"github.com/coder/coder/v2/coderd/x/chatd/internal/agentselect"
 	"github.com/coder/coder/v2/coderd/x/chatd/mcpclient"
+	skillspkg "github.com/coder/coder/v2/coderd/x/skills"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/codersdk/workspacesdk"
 	"github.com/coder/quartz"
@@ -5959,6 +5961,31 @@ type systemPromptBehaviorContext struct {
 	isRootChat           bool
 }
 
+func workspaceSkillsForResolution(workspaceSkills []chattool.SkillMeta) []skillspkg.Skill {
+	if len(workspaceSkills) == 0 {
+		return nil
+	}
+	resolved := make([]skillspkg.Skill, 0, len(workspaceSkills))
+	for _, skill := range workspaceSkills {
+		resolved = append(resolved, skillspkg.Skill{
+			Name:        skill.Name,
+			Description: skill.Description,
+			Source:      skillspkg.SourceWorkspace,
+		})
+	}
+	return resolved
+}
+
+func mergeTurnSkills(
+	personalSkills []skillspkg.Skill,
+	workspaceSkills []chattool.SkillMeta,
+) []skillspkg.ResolvedSkill {
+	return skillspkg.MergeSkills(
+		personalSkills,
+		workspaceSkillsForResolution(workspaceSkills),
+	)
+}
+
 // buildSystemPrompt applies system-level prompt injections in the
 // canonical order. It is used by both the initial prompt assembly
 // and the ReloadMessages callback to keep them in sync.
@@ -5966,7 +5993,7 @@ func buildSystemPrompt(
 	prompt []fantasy.Message,
 	subagentInstruction string,
 	instruction string,
-	skills []chattool.SkillMeta,
+	resolvedSkills []skillspkg.ResolvedSkill,
 	userPrompt string,
 	behaviorContext systemPromptBehaviorContext,
 ) []fantasy.Message {
@@ -5976,7 +6003,7 @@ func buildSystemPrompt(
 	if instruction != "" {
 		prompt = chatprompt.InsertSystem(prompt, instruction)
 	}
-	if skillIndex := chattool.FormatSkillIndex(skills); skillIndex != "" {
+	if skillIndex := chattool.FormatResolvedSkillIndex(resolvedSkills); skillIndex != "" {
 		prompt = chatprompt.InsertSystem(prompt, skillIndex)
 	}
 	if userPrompt != "" {
@@ -6035,6 +6062,65 @@ func (p *Server) loadPlanModeInstructions(
 	}
 
 	return fetched
+}
+
+func userSkillContext(ctx context.Context, userID uuid.UUID) context.Context {
+	actor := rbac.Subject{
+		Type:  rbac.SubjectTypeUser,
+		ID:    userID.String(),
+		Roles: rbac.RoleIdentifiers{rbac.RoleMember()},
+		Scope: rbac.ScopeAll,
+	}.WithCachedASTValue()
+	//nolint:gocritic // Chat turns run asynchronously after admission. The
+	// chat owner is the only user whose personal skills are fetched here.
+	return dbauthz.As(ctx, actor)
+}
+
+func (p *Server) fetchPersonalSkillMetadata(
+	ctx context.Context,
+	userID uuid.UUID,
+	logger slog.Logger,
+) []skillspkg.Skill {
+	rows, err := p.db.ListUserSkillMetadataByUserID(userSkillContext(ctx, userID), userID)
+	if err != nil {
+		logger.Warn(ctx, "failed to load personal skill metadata",
+			slog.F("owner_id", userID),
+			slog.Error(err),
+		)
+		return nil
+	}
+
+	personalSkills := make([]skillspkg.Skill, 0, len(rows))
+	for _, row := range rows {
+		personalSkills = append(personalSkills, skillspkg.Skill{
+			Name:        row.Name,
+			Description: row.Description,
+			Source:      skillspkg.SourcePersonal,
+		})
+	}
+	return personalSkills
+}
+
+func (p *Server) loadPersonalSkillBody(
+	ctx context.Context,
+	userID uuid.UUID,
+	name string,
+) (skillspkg.SkillContent, error) {
+	row, err := p.db.GetUserSkillByUserIDAndName(
+		userSkillContext(ctx, userID),
+		database.GetUserSkillByUserIDAndNameParams{
+			UserID: userID,
+			Name:   name,
+		},
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return skillspkg.SkillContent{}, skillspkg.ErrSkillNotFound
+		}
+		return skillspkg.SkillContent{}, err
+	}
+
+	return skillspkg.ValidatePersonalSkillMarkdown([]byte(row.Content))
 }
 
 func (p *Server) appendRootChatTools(
@@ -6454,6 +6540,7 @@ func (p *Server) runChat(
 		mcpCleanup         func()
 		workspaceMCPTools  []fantasy.AgentTool
 		skills             []chattool.SkillMeta
+		personalSkills     []skillspkg.Skill
 	)
 	// Check if instruction files need to be (re-)persisted.
 	// This happens when no context-file parts exist yet, or when
@@ -6532,6 +6619,10 @@ func (p *Server) runChat(
 		instruction = instructionFromContextFiles(messages)
 		skills = persistedSkills
 	}
+	g2.Go(func() error {
+		personalSkills = p.fetchPersonalSkillMetadata(ctx, chat.OwnerID, logger)
+		return nil
+	})
 	g2.Go(func() error {
 		resolvedUserPrompt = p.resolveUserPrompt(ctx, chat.OwnerID)
 		return nil
@@ -6629,11 +6720,17 @@ func (p *Server) runChat(
 	if !isRootChat {
 		subagentInstruction = defaultSubagentInstruction
 	}
+	resolvedSkillsFor := func(workspaceSkills []chattool.SkillMeta) []skillspkg.ResolvedSkill {
+		return mergeTurnSkills(personalSkills, workspaceSkills)
+	}
+	resolveSkillAlias := func(alias string) (skillspkg.ResolvedSkill, error) {
+		return skillspkg.Lookup(resolvedSkillsFor(skills), alias)
+	}
 	prompt = buildSystemPrompt(
 		prompt,
 		subagentInstruction,
 		instruction,
-		skills,
+		resolvedSkillsFor(skills),
 		resolvedUserPrompt,
 		systemPromptBehaviorContext{
 			planMode:             currentPlanMode,
@@ -7032,12 +7129,16 @@ func (p *Server) runChat(
 		})
 	}
 
-	// Append skill tools when the workspace has skills.
-	if len(skills) > 0 {
+	// Append skill tools when personal or workspace skills are available.
+	if len(personalSkills) > 0 || len(skills) > 0 {
 		skillOpts := chattool.ReadSkillOptions{
 			GetWorkspaceConn: workspaceCtx.getWorkspaceConn,
 			GetSkills: func() []chattool.SkillMeta {
 				return skills
+			},
+			ResolveAlias: resolveSkillAlias,
+			LoadPersonalSkillBody: func(ctx context.Context, name string) (skillspkg.SkillContent, error) {
+				return p.loadPersonalSkillBody(ctx, chat.OwnerID, name)
 			},
 		}
 		tools = append(tools,
@@ -7303,7 +7404,7 @@ func (p *Server) runChat(
 				reloadedPrompt,
 				subagentInstruction,
 				reloadedInstruction,
-				reloadedSkills,
+				resolvedSkillsFor(reloadedSkills),
 				reloadUserPrompt,
 				systemPromptBehaviorContext{
 					planMode:             currentPlanMode,
@@ -7350,7 +7451,7 @@ func (p *Server) runChat(
 			}
 			instructionInjected = true
 			result := chatprompt.InsertSystem(msgs, instruction)
-			if skillIndex := chattool.FormatSkillIndex(skills); skillIndex != "" {
+			if skillIndex := chattool.FormatResolvedSkillIndex(resolvedSkillsFor(skills)); skillIndex != "" {
 				result = chatprompt.InsertSystem(result, skillIndex)
 			}
 			if !chainModeActive {

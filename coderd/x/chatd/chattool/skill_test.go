@@ -13,6 +13,7 @@ import (
 	"golang.org/x/xerrors"
 
 	"github.com/coder/coder/v2/coderd/x/chatd/chattool"
+	skillspkg "github.com/coder/coder/v2/coderd/x/skills"
 	"github.com/coder/coder/v2/codersdk/workspacesdk"
 	"github.com/coder/coder/v2/codersdk/workspacesdk/agentconnmock"
 )
@@ -44,6 +45,83 @@ func TestFormatSkillIndex(t *testing.T) {
 		assert.Contains(t, idx, "- beta: Second")
 		assert.Contains(t, idx, "</available-skills>")
 		assert.Contains(t, idx, "read_skill")
+	})
+}
+
+func TestFormatResolvedSkillIndex(t *testing.T) {
+	t.Parallel()
+
+	t.Run("PersonalOnly", func(t *testing.T) {
+		t.Parallel()
+
+		idx := chattool.FormatResolvedSkillIndex([]skillspkg.ResolvedSkill{{
+			Skill: skillspkg.Skill{
+				Name:        "personal-review",
+				Description: "Personal review process",
+				Source:      skillspkg.SourcePersonal,
+			},
+			Alias: "personal-review",
+		}})
+		assert.Contains(t, idx, "- personal-review: Personal review process")
+		assert.NotContains(t, idx, "qualified alias")
+	})
+
+	t.Run("WorkspaceOnlyMatchesLegacy", func(t *testing.T) {
+		t.Parallel()
+
+		workspace := []chattool.SkillMeta{{Name: "deep-review", Description: "Review"}}
+		resolved := []skillspkg.ResolvedSkill{{
+			Skill: skillspkg.Skill{
+				Name:        "deep-review",
+				Description: "Review",
+				Source:      skillspkg.SourceWorkspace,
+			},
+			Alias: "deep-review",
+		}}
+		assert.Equal(t,
+			chattool.FormatSkillIndex(workspace),
+			chattool.FormatResolvedSkillIndex(resolved),
+		)
+	})
+
+	t.Run("MixedNonColliding", func(t *testing.T) {
+		t.Parallel()
+
+		idx := chattool.FormatResolvedSkillIndex([]skillspkg.ResolvedSkill{
+			{
+				Skill: skillspkg.Skill{
+					Name:        "personal-review",
+					Description: "Personal review process",
+					Source:      skillspkg.SourcePersonal,
+				},
+				Alias: "personal-review",
+			},
+			{
+				Skill: skillspkg.Skill{
+					Name:        "deep-review",
+					Description: "Workspace review process",
+					Source:      skillspkg.SourceWorkspace,
+				},
+				Alias: "deep-review",
+			},
+		})
+		assert.Contains(t, idx, "- personal-review: Personal review process")
+		assert.Contains(t, idx, "- deep-review: Workspace review process")
+		assert.NotContains(t, idx, "personal/personal-review")
+		assert.NotContains(t, idx, "workspace/deep-review")
+	})
+
+	t.Run("CollidingNames", func(t *testing.T) {
+		t.Parallel()
+
+		resolved := skillspkg.MergeSkills(
+			[]skillspkg.Skill{{Name: "review", Description: "Personal", Source: skillspkg.SourcePersonal}},
+			[]skillspkg.Skill{{Name: "review", Description: "Workspace", Source: skillspkg.SourceWorkspace}},
+		)
+		idx := chattool.FormatResolvedSkillIndex(resolved)
+		assert.Contains(t, idx, "- personal/review: Personal")
+		assert.Contains(t, idx, "- workspace/review: Workspace")
+		assert.Contains(t, idx, "pass that qualified alias to read_skill")
 	})
 }
 
@@ -277,6 +355,120 @@ func TestReadSkillTool(t *testing.T) {
 		assert.Contains(t, resp.Content, "Do the thing.")
 	})
 
+	t.Run("PersonalSkill", func(t *testing.T) {
+		t.Parallel()
+
+		tool := chattool.ReadSkill(chattool.ReadSkillOptions{
+			ResolveAlias: func(alias string) (skillspkg.ResolvedSkill, error) {
+				require.Equal(t, "my-skill", alias)
+				return skillspkg.ResolvedSkill{
+					Skill: skillspkg.Skill{
+						Name:        "my-skill",
+						Description: "test",
+						Source:      skillspkg.SourcePersonal,
+					},
+					Alias: "my-skill",
+				}, nil
+			},
+			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.SkillContent, error) {
+				return skillspkg.SkillContent{
+					Skill: skillspkg.Skill{
+						Name:        "my-skill",
+						Description: "test",
+						Source:      skillspkg.SourcePersonal,
+					},
+					Body: "Personal instructions.",
+				}, nil
+			},
+		})
+
+		resp, err := tool.Run(context.Background(), fantasy.ToolCall{
+			ID:    "call-1",
+			Name:  "read_skill",
+			Input: `{"name":"my-skill"}`,
+		})
+		require.NoError(t, err)
+		assert.False(t, resp.IsError)
+		assert.Contains(t, resp.Content, "Personal instructions.")
+		assert.Contains(t, resp.Content, `"files":[]`)
+	})
+
+	t.Run("WorkspaceQualifiedAlias", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		conn := agentconnmock.NewMockAgentConn(ctrl)
+
+		skills := []chattool.SkillMeta{{
+			Name:        "my-skill",
+			Description: "test",
+			Dir:         "/work/.agents/skills/my-skill",
+		}}
+
+		conn.EXPECT().ReadFile(
+			gomock.Any(), gomock.Any(), int64(0), gomock.Any(),
+		).Return(
+			io.NopCloser(strings.NewReader(validSkillMD("my-skill", "test"))),
+			"text/markdown",
+			nil,
+		)
+		conn.EXPECT().LS(gomock.Any(), "", gomock.Any()).Return(
+			workspacesdk.LSResponse{}, nil,
+		)
+
+		tool := chattool.ReadSkill(chattool.ReadSkillOptions{
+			GetWorkspaceConn: func(context.Context) (workspacesdk.AgentConn, error) {
+				return conn, nil
+			},
+			GetSkills: func() []chattool.SkillMeta { return skills },
+			ResolveAlias: func(alias string) (skillspkg.ResolvedSkill, error) {
+				require.Equal(t, "workspace/my-skill", alias)
+				return skillspkg.ResolvedSkill{
+					Skill: skillspkg.Skill{
+						Name:        "my-skill",
+						Description: "test",
+						Source:      skillspkg.SourceWorkspace,
+					},
+					Alias: "workspace/my-skill",
+				}, nil
+			},
+		})
+
+		resp, err := tool.Run(context.Background(), fantasy.ToolCall{
+			ID:    "call-1",
+			Name:  "read_skill",
+			Input: `{"name":"workspace/my-skill"}`,
+		})
+		require.NoError(t, err)
+		assert.False(t, resp.IsError)
+		assert.Contains(t, resp.Content, "Do the thing.")
+	})
+
+	t.Run("MissingPersonalSkill", func(t *testing.T) {
+		t.Parallel()
+
+		tool := chattool.ReadSkill(chattool.ReadSkillOptions{
+			ResolveAlias: func(alias string) (skillspkg.ResolvedSkill, error) {
+				return skillspkg.ResolvedSkill{
+					Skill: skillspkg.Skill{Name: alias, Source: skillspkg.SourcePersonal},
+					Alias: alias,
+				}, nil
+			},
+			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.SkillContent, error) {
+				return skillspkg.SkillContent{}, skillspkg.ErrSkillNotFound
+			},
+		})
+
+		resp, err := tool.Run(context.Background(), fantasy.ToolCall{
+			ID:    "call-1",
+			Name:  "read_skill",
+			Input: `{"name":"missing-skill"}`,
+		})
+		require.NoError(t, err)
+		assert.True(t, resp.IsError)
+		assert.Contains(t, resp.Content, `skill "missing-skill" not found`)
+	})
+
 	t.Run("UnknownSkill", func(t *testing.T) {
 		t.Parallel()
 
@@ -360,6 +552,28 @@ func TestReadSkillFileTool(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, resp.IsError)
 		assert.Contains(t, resp.Content, "reviewer guide")
+	})
+
+	t.Run("PersonalSkillUnsupported", func(t *testing.T) {
+		t.Parallel()
+
+		tool := chattool.ReadSkillFile(chattool.ReadSkillOptions{
+			ResolveAlias: func(alias string) (skillspkg.ResolvedSkill, error) {
+				return skillspkg.ResolvedSkill{
+					Skill: skillspkg.Skill{Name: alias, Source: skillspkg.SourcePersonal},
+					Alias: alias,
+				}, nil
+			},
+		})
+
+		resp, err := tool.Run(context.Background(), fantasy.ToolCall{
+			ID:    "call-1",
+			Name:  "read_skill_file",
+			Input: `{"name":"my-skill","path":"helper.md"}`,
+		})
+		require.NoError(t, err)
+		assert.True(t, resp.IsError)
+		assert.Contains(t, resp.Content, "not supported for personal skills")
 	})
 
 	t.Run("TraversalRejected", func(t *testing.T) {

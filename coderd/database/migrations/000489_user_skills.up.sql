@@ -10,7 +10,6 @@ CREATE TABLE user_skills (
 );
 
 CREATE UNIQUE INDEX user_skills_user_id_name_idx ON user_skills (user_id, name);
-CREATE INDEX user_skills_user_id_idx ON user_skills (user_id);
 
 -- Adds the user skill audit resource type.
 ALTER TYPE resource_type ADD VALUE IF NOT EXISTS 'user_skill';

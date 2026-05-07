@@ -10,6 +10,40 @@ import (
 	"github.com/coder/coder/v2/coderd/x/skills"
 )
 
+func TestParsePersonalSkillMarkdown(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AcceptsNonKebabCaseName", func(t *testing.T) {
+		t.Parallel()
+
+		content, err := skills.ParsePersonalSkillMarkdown([]byte(
+			"---\nname: NotKebab\ndescription: Parser accepts this\n---\nBody.\n",
+		))
+
+		require.NoError(t, err)
+		require.Equal(t, "NotKebab", content.Name)
+		require.Equal(t, "Parser accepts this", content.Description)
+		require.Equal(t, "Body.", content.Body)
+	})
+
+	t.Run("AcceptsOversizedContent", func(t *testing.T) {
+		t.Parallel()
+
+		raw := []byte(userSkillMarkdownForTest(
+			"oversized-skill",
+			"Parser accepts oversized content.",
+			strings.Repeat("a", skills.MaxPersonalSkillSizeBytes),
+		))
+		require.Greater(t, len(raw), skills.MaxPersonalSkillSizeBytes)
+
+		content, err := skills.ParsePersonalSkillMarkdown(raw)
+
+		require.NoError(t, err)
+		require.Equal(t, "oversized-skill", content.Name)
+		require.Len(t, content.Body, skills.MaxPersonalSkillSizeBytes)
+	})
+}
+
 func TestValidatePersonalSkillMarkdown(t *testing.T) {
 	t.Parallel()
 
@@ -64,7 +98,7 @@ func TestValidatePersonalSkillMarkdown(t *testing.T) {
 			"---\ndescription: No name\n---\nBody.\n",
 		))
 
-		require.ErrorContains(t, err, "frontmatter missing required 'name' field")
+		require.ErrorIs(t, err, skills.ErrInvalidSkillName)
 	})
 
 	t.Run("NonKebabCaseName", func(t *testing.T) {
@@ -86,6 +120,7 @@ func TestValidatePersonalSkillMarkdown(t *testing.T) {
 		))
 
 		require.ErrorIs(t, err, skills.ErrSkillBodyRequired)
+		require.ErrorContains(t, err, "my-skill")
 	})
 
 	t.Run("OversizedContent", func(t *testing.T) {
@@ -96,6 +131,10 @@ func TestValidatePersonalSkillMarkdown(t *testing.T) {
 
 		require.ErrorIs(t, err, skills.ErrSkillTooLarge)
 	})
+}
+
+func userSkillMarkdownForTest(name string, description string, body string) string {
+	return "---\nname: " + name + "\ndescription: " + description + "\n---\n\n" + body + "\n"
 }
 
 func TestMergeSkills(t *testing.T) {
@@ -197,6 +236,25 @@ func TestMergeSkills(t *testing.T) {
 
 func TestLookup(t *testing.T) {
 	t.Parallel()
+
+	t.Run("BareNameOnNonCollidingSkill", func(t *testing.T) {
+		t.Parallel()
+
+		resolved := skills.MergeSkills(
+			[]skills.Skill{{Name: "personal-skill"}},
+			[]skills.Skill{{Name: "workspace-skill"}},
+		)
+
+		personal, err := skills.Lookup(resolved, "personal-skill")
+		require.NoError(t, err)
+		require.Equal(t, skills.SourcePersonal, personal.Source)
+		require.Equal(t, "personal-skill", personal.Name)
+
+		workspace, err := skills.Lookup(resolved, "workspace-skill")
+		require.NoError(t, err)
+		require.Equal(t, skills.SourceWorkspace, workspace.Source)
+		require.Equal(t, "workspace-skill", workspace.Name)
+	})
 
 	t.Run("QualifiedAliasWorksWithoutCollision", func(t *testing.T) {
 		t.Parallel()

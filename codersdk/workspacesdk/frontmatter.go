@@ -7,6 +7,12 @@ import (
 	"golang.org/x/xerrors"
 )
 
+// SkillNameRegex validates kebab-case skill names.
+const SkillNameRegex = "^[a-z0-9]+(-[a-z0-9]+)*$"
+
+// SkillNamePattern validates kebab-case skill names.
+var SkillNamePattern = regexp.MustCompile(SkillNameRegex)
+
 // markdownCommentRe strips HTML comments from skill file bodies so
 // they don't leak into the LLM prompt.
 var markdownCommentRe = regexp.MustCompile(`<!--[\s\S]*?-->`)

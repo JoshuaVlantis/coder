@@ -32,11 +32,17 @@ type UserSkill struct {
 
 // CreateUserSkillRequest is the payload for creating a user skill.
 type CreateUserSkillRequest struct {
+	// Content must be SKILL.md-format Markdown with YAML frontmatter. The
+	// frontmatter must include name, may include description, and must be
+	// followed by a non-empty body.
 	Content string `json:"content"`
 }
 
 // UpdateUserSkillRequest is the payload for updating a user skill.
 type UpdateUserSkillRequest struct {
+	// Content must be SKILL.md-format Markdown with YAML frontmatter. The
+	// frontmatter must include name, may include description, and must be
+	// followed by a non-empty body.
 	Content string `json:"content"`
 }
 

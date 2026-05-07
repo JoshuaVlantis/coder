@@ -3185,6 +3185,33 @@ func TestLoadPersonalSkillBody(t *testing.T) {
 		_, err := server.loadPersonalSkillBody(context.Background(), userID, "missing-skill")
 		require.ErrorIs(t, err, skillspkg.ErrSkillNotFound)
 	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		t.Parallel()
+
+		ctrl := gomock.NewController(t)
+		db := dbmock.NewMockStore(ctrl)
+		sink := testutil.NewFakeSink(t)
+		server := &Server{db: db, logger: sink.Logger()}
+		userID := uuid.New()
+		params := database.GetUserSkillByUserIDAndNameParams{
+			UserID: userID,
+			Name:   "error-skill",
+		}
+		dbErr := xerrors.New("database unavailable")
+
+		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).Return(database.UserSkill{}, dbErr)
+
+		_, err := server.loadPersonalSkillBody(context.Background(), userID, "error-skill")
+
+		require.ErrorContains(t, err, "load personal skill body")
+		require.ErrorIs(t, err, dbErr)
+		entries := sink.Entries(func(e slog.SinkEntry) bool {
+			return e.Level == slog.LevelError && e.Message == "load personal skill body failed"
+		})
+		require.Len(t, entries, 1)
+		requireFieldValue(t, entries[0], "error", dbErr)
+	})
 }
 
 func systemPromptText(t *testing.T, prompt []fantasy.Message) string {

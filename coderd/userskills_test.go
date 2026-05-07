@@ -82,35 +82,47 @@ func TestUserSkillValidationAndConflicts(t *testing.T) {
 	ctx := testutil.Context(t, testutil.WaitMedium)
 
 	tests := []struct {
-		name    string
-		content string
+		name            string
+		content         string
+		expectedMessage string
 	}{
 		{
-			name:    "MissingFrontmatterDelimiters",
-			content: "name: missing-frontmatter\n\nBody.",
+			name:            "MissingFrontmatterDelimiters",
+			content:         "name: missing-frontmatter\n\nBody.",
+			expectedMessage: "Invalid skill content.",
 		},
 		{
 			name: "MissingName",
 			content: "---\n" +
 				"description: Missing name\n" +
 				"---\n\nBody.",
+			expectedMessage: "Invalid skill name.",
 		},
 		{
-			name:    "NonKebabCaseName",
-			content: userSkillMarkdown("NotKebab", "Invalid", "Body."),
+			name:            "NonKebabCaseName",
+			content:         userSkillMarkdown("NotKebab", "Invalid", "Body."),
+			expectedMessage: "Invalid skill name.",
 		},
 		{
-			name:    "EmptyBody",
-			content: userSkillMarkdown("empty-body", "Invalid", "   \n"),
+			name:            "EmptyBody",
+			content:         userSkillMarkdown("empty-body", "Invalid", "   \n"),
+			expectedMessage: "Skill body is required.",
 		},
 		{
-			name:    "TooLarge",
-			content: strings.Repeat("a", skills.MaxPersonalSkillSizeBytes+1),
+			name:            "TooLarge",
+			content:         strings.Repeat("a", skills.MaxPersonalSkillSizeBytes+1),
+			expectedMessage: "Skill content is too large.",
 		},
 	}
 	for _, tt := range tests {
-		_, err := owner.CreateUserSkill(ctx, codersdk.Me, codersdk.CreateUserSkillRequest{Content: tt.content})
-		requireSDKErrorStatus(t, err, http.StatusBadRequest, tt.name)
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			subCtx := testutil.Context(t, testutil.WaitMedium)
+			_, err := owner.CreateUserSkill(subCtx, codersdk.Me, codersdk.CreateUserSkillRequest{Content: tt.content})
+			sdkErr := requireSDKErrorStatus(t, err, http.StatusBadRequest)
+			assert.Equal(t, tt.expectedMessage, sdkErr.Message)
+		})
 	}
 
 	sharedContent := userSkillMarkdown("shared-skill", "Shared", "Shared body.")
@@ -121,6 +133,34 @@ func TestUserSkillValidationAndConflicts(t *testing.T) {
 
 	_, err = other.CreateUserSkill(ctx, codersdk.Me, codersdk.CreateUserSkillRequest{Content: sharedContent})
 	require.NoError(t, err)
+}
+
+func TestUserSkillLimit(t *testing.T) {
+	t.Parallel()
+
+	adminClient := coderdtest.New(t, nil)
+	firstUser := coderdtest.CreateFirstUser(t, adminClient)
+	ownerClient, _ := coderdtest.CreateAnotherUser(t, adminClient, firstUser.OrganizationID)
+	owner := codersdk.NewExperimentalClient(ownerClient)
+	ctx := testutil.Context(t, testutil.WaitLong)
+
+	for i := range skills.MaxPersonalSkillsPerUser {
+		name := fmt.Sprintf("limit-skill-%03d", i)
+		_, err := owner.CreateUserSkill(ctx, codersdk.Me, codersdk.CreateUserSkillRequest{
+			Content: userSkillMarkdown(name, "Limit", "Body."),
+		})
+		require.NoError(t, err)
+	}
+
+	_, err := owner.CreateUserSkill(ctx, codersdk.Me, codersdk.CreateUserSkillRequest{
+		Content: userSkillMarkdown("limit-skill-overflow", "Limit", "Body."),
+	})
+	sdkErr := requireSDKErrorStatus(t, err, http.StatusForbidden)
+	assert.Equal(t, "Personal skill limit reached.", sdkErr.Message)
+	assert.Equal(t,
+		fmt.Sprintf("Each user can have at most %d personal skills.", skills.MaxPersonalSkillsPerUser),
+		sdkErr.Detail,
+	)
 }
 
 func TestUserSkillMissingAndUpdateMismatch(t *testing.T) {
@@ -152,6 +192,7 @@ func TestUserSkillMissingAndUpdateMismatch(t *testing.T) {
 	})
 	sdkErr := requireSDKErrorStatus(t, err, http.StatusBadRequest)
 	assert.Contains(t, sdkErr.Message, "skill name in path does not match frontmatter name")
+	assert.Equal(t, `path has "old-name", frontmatter has "new-name"`, sdkErr.Detail)
 }
 
 func TestUserSkillAuthorization(t *testing.T) {

@@ -2,6 +2,7 @@ package coderd
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -40,21 +41,39 @@ func (api *API) postUserSkill(rw http.ResponseWriter, r *http.Request) {
 	)
 	defer commitAudit()
 
+	r.Body = http.MaxBytesReader(rw, r.Body, skills.MaxPersonalSkillSizeBytes+1024)
+
 	var req codersdk.CreateUserSkillRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
 		return
 	}
 
-	skillContent, err := skills.ValidatePersonalSkillMarkdown([]byte(req.Content))
+	parsedSkill, err := skills.ValidatePersonalSkillMarkdown([]byte(req.Content))
 	if err != nil {
 		writeInvalidUserSkillContent(ctx, rw, err)
 		return
 	}
 
+	existingSkills, err := api.Database.ListUserSkillMetadataByUserID(ctx, user.ID)
+	if err != nil {
+		httpapi.InternalServerError(rw, err)
+		return
+	}
+	if len(existingSkills) >= skills.MaxPersonalSkillsPerUser {
+		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+			Message: "Personal skill limit reached.",
+			Detail: fmt.Sprintf(
+				"Each user can have at most %d personal skills.",
+				skills.MaxPersonalSkillsPerUser,
+			),
+		})
+		return
+	}
+
 	skill, err := api.Database.InsertUserSkill(ctx, database.InsertUserSkillParams{
 		UserID:      user.ID,
-		Name:        skillContent.Name,
-		Description: skillContent.Description,
+		Name:        parsedSkill.Name,
+		Description: parsedSkill.Description,
 		Content:     req.Content,
 	})
 	if err != nil {
@@ -82,7 +101,7 @@ func (api *API) postUserSkill(rw http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} codersdk.UserSkillMetadata
 // @Router /api/experimental/users/{user}/skills [get]
 // @x-apidocgen {"skip": true}
-func (api *API) getUserSkills(rw http.ResponseWriter, r *http.Request) { //nolint:revive // This HTTP handler writes the route response directly.
+func (api *API) getUserSkills(rw http.ResponseWriter, r *http.Request) { //nolint:revive // Method name matches route.
 	ctx := r.Context()
 	user := httpmw.UserParam(r)
 
@@ -153,19 +172,22 @@ func (api *API) patchUserSkill(rw http.ResponseWriter, r *http.Request) {
 	)
 	defer commitAudit()
 
+	r.Body = http.MaxBytesReader(rw, r.Body, skills.MaxPersonalSkillSizeBytes+1024)
+
 	var req codersdk.UpdateUserSkillRequest
 	if !httpapi.Read(ctx, rw, r, &req) {
 		return
 	}
 
-	skillContent, err := skills.ValidatePersonalSkillMarkdown([]byte(req.Content))
+	parsedSkill, err := skills.ValidatePersonalSkillMarkdown([]byte(req.Content))
 	if err != nil {
 		writeInvalidUserSkillContent(ctx, rw, err)
 		return
 	}
-	if skillContent.Name != name {
+	if parsedSkill.Name != name {
 		httpapi.Write(ctx, rw, http.StatusBadRequest, codersdk.Response{
 			Message: "skill name in path does not match frontmatter name",
+			Detail:  fmt.Sprintf("path has %q, frontmatter has %q", name, parsedSkill.Name),
 		})
 		return
 	}
@@ -173,7 +195,7 @@ func (api *API) patchUserSkill(rw http.ResponseWriter, r *http.Request) {
 	params := database.UpdateUserSkillByUserIDAndNameParams{
 		UserID:      user.ID,
 		Name:        name,
-		Description: skillContent.Description,
+		Description: parsedSkill.Description,
 		Content:     req.Content,
 	}
 

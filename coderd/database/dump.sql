@@ -3979,8 +3979,6 @@ CREATE UNIQUE INDEX user_secrets_user_file_path_idx ON user_secrets USING btree 
 
 CREATE UNIQUE INDEX user_secrets_user_name_idx ON user_secrets USING btree (user_id, name);
 
-CREATE INDEX user_skills_user_id_idx ON user_skills USING btree (user_id);
-
 CREATE UNIQUE INDEX user_skills_user_id_name_idx ON user_skills USING btree (user_id, name);
 
 CREATE UNIQUE INDEX users_email_lower_idx ON users USING btree (lower(email)) WHERE ((deleted = false) AND (email <> ''::text));

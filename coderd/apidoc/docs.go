@@ -17404,6 +17404,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "content": {
+                    "description": "Content must be SKILL.md-format Markdown with YAML frontmatter. The\nfrontmatter must include name, may include description, and must be\nfollowed by a non-empty body.",
                     "type": "string"
                 }
             }
@@ -23680,6 +23681,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "content": {
+                    "description": "Content must be SKILL.md-format Markdown with YAML frontmatter. The\nfrontmatter must include name, may include description, and must be\nfollowed by a non-empty body.",
                     "type": "string"
                 }
             }

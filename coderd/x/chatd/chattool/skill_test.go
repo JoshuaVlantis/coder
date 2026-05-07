@@ -12,10 +12,12 @@ import (
 	"go.uber.org/mock/gomock"
 	"golang.org/x/xerrors"
 
+	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/x/chatd/chattool"
 	skillspkg "github.com/coder/coder/v2/coderd/x/skills"
 	"github.com/coder/coder/v2/codersdk/workspacesdk"
 	"github.com/coder/coder/v2/codersdk/workspacesdk/agentconnmock"
+	"github.com/coder/coder/v2/testutil"
 )
 
 // validSkillMD returns a valid SKILL.md with the given name and
@@ -24,32 +26,13 @@ func validSkillMD(name, description string) string {
 	return "---\nname: " + name + "\ndescription: " + description + "\n---\n\n# Instructions\n\nDo the thing.\n"
 }
 
-func TestFormatSkillIndex(t *testing.T) {
+func TestFormatResolvedSkillIndex(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Empty", func(t *testing.T) {
 		t.Parallel()
-		assert.Empty(t, chattool.FormatSkillIndex(nil))
+		assert.Empty(t, chattool.FormatResolvedSkillIndex(nil))
 	})
-
-	t.Run("RendersIndex", func(t *testing.T) {
-		t.Parallel()
-
-		skills := []chattool.SkillMeta{
-			{Name: "alpha", Description: "First"},
-			{Name: "beta", Description: "Second"},
-		}
-		idx := chattool.FormatSkillIndex(skills)
-		assert.Contains(t, idx, "<available-skills>")
-		assert.Contains(t, idx, "- alpha: First")
-		assert.Contains(t, idx, "- beta: Second")
-		assert.Contains(t, idx, "</available-skills>")
-		assert.Contains(t, idx, "read_skill")
-	})
-}
-
-func TestFormatResolvedSkillIndex(t *testing.T) {
-	t.Parallel()
 
 	t.Run("PersonalOnly", func(t *testing.T) {
 		t.Parallel()
@@ -69,7 +52,6 @@ func TestFormatResolvedSkillIndex(t *testing.T) {
 	t.Run("WorkspaceOnlyMatchesLegacy", func(t *testing.T) {
 		t.Parallel()
 
-		workspace := []chattool.SkillMeta{{Name: "deep-review", Description: "Review"}}
 		resolved := []skillspkg.ResolvedSkill{{
 			Skill: skillspkg.Skill{
 				Name:        "deep-review",
@@ -79,7 +61,12 @@ func TestFormatResolvedSkillIndex(t *testing.T) {
 			Alias: "deep-review",
 		}}
 		assert.Equal(t,
-			chattool.FormatSkillIndex(workspace),
+			"<available-skills>\n"+
+				"Use read_skill to load a skill's full instructions before following them.\n"+
+				"Use read_skill_file to read supporting files referenced by a skill.\n"+
+				"\n"+
+				"- deep-review: Review\n"+
+				"</available-skills>",
 			chattool.FormatResolvedSkillIndex(resolved),
 		)
 	})
@@ -370,8 +357,8 @@ func TestReadSkillTool(t *testing.T) {
 					Alias: "my-skill",
 				}, nil
 			},
-			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.SkillContent, error) {
-				return skillspkg.SkillContent{
+			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.ParsedSkill, error) {
+				return skillspkg.ParsedSkill{
 					Skill: skillspkg.Skill{
 						Name:        "my-skill",
 						Description: "test",
@@ -391,6 +378,46 @@ func TestReadSkillTool(t *testing.T) {
 		assert.False(t, resp.IsError)
 		assert.Contains(t, resp.Content, "Personal instructions.")
 		assert.Contains(t, resp.Content, `"files":[]`)
+	})
+
+	t.Run("PersonalQualifiedAliasUsesCanonicalName", func(t *testing.T) {
+		t.Parallel()
+
+		var loadedName string
+		tool := chattool.ReadSkill(chattool.ReadSkillOptions{
+			ResolveAlias: func(alias string) (skillspkg.ResolvedSkill, error) {
+				require.Equal(t, "personal/my-skill", alias)
+				return skillspkg.ResolvedSkill{
+					Skill: skillspkg.Skill{
+						Name:        "my-skill",
+						Description: "test",
+						Source:      skillspkg.SourcePersonal,
+					},
+					Alias: "personal/my-skill",
+				}, nil
+			},
+			LoadPersonalSkillBody: func(_ context.Context, name string) (skillspkg.ParsedSkill, error) {
+				loadedName = name
+				return skillspkg.ParsedSkill{
+					Skill: skillspkg.Skill{
+						Name:        "my-skill",
+						Description: "test",
+						Source:      skillspkg.SourcePersonal,
+					},
+					Body: "Personal instructions.",
+				}, nil
+			},
+		})
+
+		resp, err := tool.Run(context.Background(), fantasy.ToolCall{
+			ID:    "call-1",
+			Name:  "read_skill",
+			Input: `{"name":"personal/my-skill"}`,
+		})
+
+		require.NoError(t, err)
+		assert.False(t, resp.IsError)
+		assert.Equal(t, "my-skill", loadedName)
 	})
 
 	t.Run("WorkspaceQualifiedAlias", func(t *testing.T) {
@@ -454,8 +481,8 @@ func TestReadSkillTool(t *testing.T) {
 					Alias: alias,
 				}, nil
 			},
-			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.SkillContent, error) {
-				return skillspkg.SkillContent{}, skillspkg.ErrSkillNotFound
+			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.ParsedSkill, error) {
+				return skillspkg.ParsedSkill{}, skillspkg.ErrSkillNotFound
 			},
 		})
 
@@ -467,6 +494,39 @@ func TestReadSkillTool(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, resp.IsError)
 		assert.Contains(t, resp.Content, `skill "missing-skill" not found`)
+	})
+
+	t.Run("PersonalSkillLoaderErrorIsSanitized", func(t *testing.T) {
+		t.Parallel()
+
+		sink := testutil.NewFakeSink(t)
+		tool := chattool.ReadSkill(chattool.ReadSkillOptions{
+			Logger: sink.Logger(),
+			ResolveAlias: func(alias string) (skillspkg.ResolvedSkill, error) {
+				return skillspkg.ResolvedSkill{
+					Skill: skillspkg.Skill{Name: alias, Source: skillspkg.SourcePersonal},
+					Alias: alias,
+				}, nil
+			},
+			LoadPersonalSkillBody: func(context.Context, string) (skillspkg.ParsedSkill, error) {
+				return skillspkg.ParsedSkill{}, xerrors.New("synthetic private storage failure")
+			},
+		})
+
+		resp, err := tool.Run(context.Background(), fantasy.ToolCall{
+			ID:    "call-1",
+			Name:  "read_skill",
+			Input: `{"name":"my-skill"}`,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, resp.IsError)
+		assert.Contains(t, resp.Content, "failed to load personal skill")
+		assert.NotContains(t, resp.Content, "synthetic private storage failure")
+		entries := sink.Entries(func(e slog.SinkEntry) bool {
+			return e.Level == slog.LevelError && e.Message == "failed to load personal skill"
+		})
+		require.Len(t, entries, 1)
 	})
 
 	t.Run("UnknownSkill", func(t *testing.T) {

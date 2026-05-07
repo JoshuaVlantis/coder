@@ -4735,9 +4735,9 @@ This is required on creation to enable a user-flow of validating a template work
 
 ### Properties
 
-| Name      | Type   | Required | Restrictions | Description |
-|-----------|--------|----------|--------------|-------------|
-| `content` | string | false    |              |             |
+| Name      | Type   | Required | Restrictions | Description                                                                                                                                                           |
+|-----------|--------|----------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `content` | string | false    |              | Content must be SKILL.md-format Markdown with YAML frontmatter. The frontmatter must include name, may include description, and must be followed by a non-empty body. |
 
 ## codersdk.CreateWorkspaceBuildReason
 
@@ -12895,9 +12895,9 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 
 ### Properties
 
-| Name      | Type   | Required | Restrictions | Description |
-|-----------|--------|----------|--------------|-------------|
-| `content` | string | false    |              |             |
+| Name      | Type   | Required | Restrictions | Description                                                                                                                                                           |
+|-----------|--------|----------|--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `content` | string | false    |              | Content must be SKILL.md-format Markdown with YAML frontmatter. The frontmatter must include name, may include description, and must be followed by a non-empty body. |
 
 ## codersdk.UpdateWorkspaceACL
 

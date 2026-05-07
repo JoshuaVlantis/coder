@@ -11,6 +11,7 @@ import (
 	"charm.land/fantasy"
 	"golang.org/x/xerrors"
 
+	"cdr.dev/slog/v3"
 	skillspkg "github.com/coder/coder/v2/coderd/x/skills"
 	"github.com/coder/coder/v2/codersdk/workspacesdk"
 )
@@ -44,20 +45,6 @@ type SkillContent struct {
 	// Files lists relative paths of supporting files in the
 	// skill directory (everything except the skill meta file).
 	Files []string
-}
-
-// FormatSkillIndex renders an XML block listing all discovered
-// skills. This block is injected into the system prompt so the
-// model knows which skills are available and how to load them.
-func FormatSkillIndex(skills []SkillMeta) string {
-	entries := make([]skillIndexEntry, 0, len(skills))
-	for _, s := range skills {
-		entries = append(entries, skillIndexEntry{
-			Alias:       s.Name,
-			Description: s.Description,
-		})
-	}
-	return renderSkillIndex(entries, skillIndexFormatOptions{})
 }
 
 // FormatResolvedSkillIndex renders an XML block listing all source-aware
@@ -268,8 +255,9 @@ type ReadSkillOptions struct {
 	GetWorkspaceConn func(context.Context) (workspacesdk.AgentConn, error)
 	GetSkills        func() []SkillMeta
 
+	Logger                slog.Logger
 	ResolveAlias          func(string) (skillspkg.ResolvedSkill, error)
-	LoadPersonalSkillBody func(context.Context, string) (skillspkg.SkillContent, error)
+	LoadPersonalSkillBody func(context.Context, string) (skillspkg.ParsedSkill, error)
 }
 
 // ReadSkillArgs are the parameters accepted by read_skill.
@@ -311,7 +299,11 @@ func ReadSkill(options ReadSkillOptions) fantasy.AgentTool {
 					if xerrors.Is(err, skillspkg.ErrSkillNotFound) {
 						return skillNotFoundResponse(args.Name), nil
 					}
-					return fantasy.NewTextErrorResponse(err.Error()), nil
+					options.Logger.Error(ctx, "failed to load personal skill",
+						slog.F("name", resolved.Name),
+						slog.Error(err),
+					)
+					return fantasy.NewTextErrorResponse("failed to load personal skill"), nil
 				}
 				return toolResponse(map[string]any{
 					"name":  content.Name,

@@ -3312,6 +3312,11 @@ export interface CreateUserSecretRequest {
  * CreateUserSkillRequest is the payload for creating a user skill.
  */
 export interface CreateUserSkillRequest {
+	/**
+	 * Content must be SKILL.md-format Markdown with YAML frontmatter. The
+	 * frontmatter must include name, may include description, and must be
+	 * followed by a non-empty body.
+	 */
 	readonly content: string;
 }
 
@@ -8408,6 +8413,11 @@ export interface UpdateUserSecretRequest {
  * UpdateUserSkillRequest is the payload for updating a user skill.
  */
 export interface UpdateUserSkillRequest {
+	/**
+	 * Content must be SKILL.md-format Markdown with YAML frontmatter. The
+	 * frontmatter must include name, may include description, and must be
+	 * followed by a non-empty body.
+	 */
 	readonly content: string;
 }
 

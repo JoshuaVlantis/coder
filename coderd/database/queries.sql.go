@@ -6970,6 +6970,8 @@ func (q *sqlQuerier) GetChatUsageLimitUserOverride(ctx context.Context, userID u
 const getChats = `-- name: GetChats :many
 SELECT
     chats.id, chats.owner_id, chats.workspace_id, chats.title, chats.status, chats.worker_id, chats.started_at, chats.heartbeat_at, chats.created_at, chats.updated_at, chats.parent_chat_id, chats.root_chat_id, chats.last_model_config_id, chats.archived, chats.last_error, chats.mode, chats.mcp_server_ids, chats.labels, chats.build_id, chats.agent_id, chats.pin_order, chats.last_read_message_id, chats.last_injected_context, chats.dynamic_tools, chats.organization_id, chats.plan_mode, chats.client_type, chats.last_turn_summary, chats.user_acl, chats.group_acl,
+    users.username AS owner_username,
+    users.name AS owner_name,
     EXISTS (
         SELECT 1 FROM chat_messages cm
         WHERE cm.chat_id = chats.id
@@ -6979,6 +6981,7 @@ SELECT
     ) AS has_unread
 FROM
     chats
+    JOIN users ON users.id = chats.owner_id
 WHERE
     CASE
         WHEN $1::boolean THEN chats.owner_id = $2::uuid
@@ -6998,7 +7001,7 @@ WHERE
         -- (pin_order is negated so lower values sort first in DESC order),
         -- which lets us use a single tuple < comparison.
         WHEN $5 :: uuid != '00000000-0000-0000-0000-000000000000'::uuid THEN (
-            (CASE WHEN pin_order > 0 THEN 1 ELSE 0 END, -pin_order, updated_at, id) < (
+            (CASE WHEN chats.pin_order > 0 THEN 1 ELSE 0 END, -chats.pin_order, chats.updated_at, chats.id) < (
                 SELECT
                     CASE WHEN c2.pin_order > 0 THEN 1 ELSE 0 END, -c2.pin_order, c2.updated_at, c2.id
                 FROM
@@ -7025,10 +7028,10 @@ ORDER BY
     -- pinned chats, lower pin_order values come first. The negation
     -- trick (-pin_order) keeps all sort columns DESC so the cursor
     -- tuple < comparison works with uniform direction.
-    CASE WHEN pin_order > 0 THEN 1 ELSE 0 END DESC,
-    -pin_order DESC,
-    updated_at DESC,
-    id DESC
+    CASE WHEN chats.pin_order > 0 THEN 1 ELSE 0 END DESC,
+    -chats.pin_order DESC,
+    chats.updated_at DESC,
+    chats.id DESC
 OFFSET $7
 LIMIT
     -- The chat list is unbounded and expected to grow large.
@@ -7048,8 +7051,10 @@ type GetChatsParams struct {
 }
 
 type GetChatsRow struct {
-	Chat      Chat `db:"chat" json:"chat"`
-	HasUnread bool `db:"has_unread" json:"has_unread"`
+	Chat          Chat   `db:"chat" json:"chat"`
+	OwnerUsername string `db:"owner_username" json:"owner_username"`
+	OwnerName     string `db:"owner_name" json:"owner_name"`
+	HasUnread     bool   `db:"has_unread" json:"has_unread"`
 }
 
 func (q *sqlQuerier) GetChats(ctx context.Context, arg GetChatsParams) ([]GetChatsRow, error) {
@@ -7101,6 +7106,8 @@ func (q *sqlQuerier) GetChats(ctx context.Context, arg GetChatsParams) ([]GetCha
 			&i.Chat.LastTurnSummary,
 			&i.Chat.UserACL,
 			&i.Chat.GroupACL,
+			&i.OwnerUsername,
+			&i.OwnerName,
 			&i.HasUnread,
 		); err != nil {
 			return nil, err
@@ -7388,6 +7395,8 @@ WITH chats AS (
 )
 SELECT
     chats.id, chats.owner_id, chats.workspace_id, chats.title, chats.status, chats.worker_id, chats.started_at, chats.heartbeat_at, chats.created_at, chats.updated_at, chats.parent_chat_id, chats.root_chat_id, chats.last_model_config_id, chats.archived, chats.last_error, chats.mode, chats.mcp_server_ids, chats.labels, chats.build_id, chats.agent_id, chats.pin_order, chats.last_read_message_id, chats.last_injected_context, chats.dynamic_tools, chats.organization_id, chats.plan_mode, chats.client_type, chats.last_turn_summary, chats.user_acl, chats.group_acl,
+    users.username AS owner_username,
+    users.name AS owner_name,
     EXISTS (
         SELECT 1 FROM chat_messages cm
         WHERE cm.chat_id = chats.id
@@ -7397,6 +7406,7 @@ SELECT
     ) AS has_unread
 FROM
     chats
+    JOIN users ON users.id = chats.owner_id
 WHERE
     chats.parent_chat_id = ANY($1 :: uuid[])
     AND CASE
@@ -7414,8 +7424,10 @@ type GetChildChatsByParentIDsParams struct {
 }
 
 type GetChildChatsByParentIDsRow struct {
-	Chat      Chat `db:"chat" json:"chat"`
-	HasUnread bool `db:"has_unread" json:"has_unread"`
+	Chat          Chat   `db:"chat" json:"chat"`
+	OwnerUsername string `db:"owner_username" json:"owner_username"`
+	OwnerName     string `db:"owner_name" json:"owner_name"`
+	HasUnread     bool   `db:"has_unread" json:"has_unread"`
 }
 
 // Fetches child chats of the given parents, optionally filtered by
@@ -7462,6 +7474,8 @@ func (q *sqlQuerier) GetChildChatsByParentIDs(ctx context.Context, arg GetChildC
 			&i.Chat.LastTurnSummary,
 			&i.Chat.UserACL,
 			&i.Chat.GroupACL,
+			&i.OwnerUsername,
+			&i.OwnerName,
 			&i.HasUnread,
 		); err != nil {
 			return nil, err

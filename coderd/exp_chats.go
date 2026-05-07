@@ -453,6 +453,30 @@ func (api *API) getChatDiffStatusesByChatID(
 	return statusesByChatID, nil
 }
 
+func (api *API) convertChatWithOwner(
+	ctx context.Context,
+	chat database.Chat,
+	diffStatus *database.ChatDiffStatus,
+	files []database.GetChatFileMetadataByChatIDRow,
+) (codersdk.Chat, error) {
+	// The caller already authorized access to the chat, and shared viewers
+	// may not otherwise be allowed to read the owner's user record.
+	//nolint:gocritic
+	owners, err := api.Database.GetUsersByIDs(
+		dbauthz.AsSystemRestricted(ctx),
+		[]uuid.UUID{chat.OwnerID},
+	)
+	if err != nil {
+		return codersdk.Chat{}, xerrors.Errorf("get chat owner: %w", err)
+	}
+	if len(owners) == 0 {
+		return codersdk.Chat{}, xerrors.Errorf("get chat owner: %w", sql.ErrNoRows)
+	}
+
+	owner := owners[0]
+	return db2sdk.ChatWithOwner(chat, owner.Username, owner.Name, diffStatus, files), nil
+}
+
 func planModeToNullChatPlanMode(mode codersdk.ChatPlanMode) database.NullChatPlanMode {
 	if mode == "" {
 		return database.NullChatPlanMode{}
@@ -1191,20 +1215,15 @@ func (api *API) postChats(rw http.ResponseWriter, r *http.Request) {
 	// enforced in SQL).
 	unlinked, capExceeded := api.linkFilesToChat(ctx, chat.ID, fileIDs)
 
-	// Re-read the chat so the response reflects the authoritative
-	// database state (file links are deduped in the join table).
-	chat, err = api.Database.GetChatByID(ctx, chat.ID)
+	chatFiles := api.fetchChatFileMetadata(ctx, chat.ID)
+	response, err := api.convertChatWithOwner(ctx, chat, nil, chatFiles)
 	if err != nil {
 		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
-			Message: "Failed to read back chat after creation.",
+			Message: "Failed to fetch chat owner.",
 			Detail:  err.Error(),
 		})
 		return
 	}
-	aReq.New = chat
-
-	chatFiles := api.fetchChatFileMetadata(ctx, chat.ID)
-	response := db2sdk.Chat(chat, nil, chatFiles)
 	if len(unlinked) > 0 {
 		if capExceeded {
 			response.Warnings = append(response.Warnings, fileLinkCapWarning(len(unlinked)))
@@ -1949,7 +1968,14 @@ func (api *API) getChat(rw http.ResponseWriter, r *http.Request) {
 	// Hydrate file metadata for all files linked to this chat.
 	chatFiles := api.fetchChatFileMetadata(ctx, chat.ID)
 
-	sdkChat := db2sdk.Chat(chat, diffStatus, chatFiles)
+	sdkChat, err := api.convertChatWithOwner(ctx, chat, diffStatus, chatFiles)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Failed to fetch chat owner.",
+			Detail:  err.Error(),
+		})
+		return
+	}
 
 	// For root chats, embed children so callers get a complete
 	// tree in a single response.
@@ -3461,7 +3487,15 @@ func (api *API) interruptChat(rw http.ResponseWriter, r *http.Request) {
 		chat = updatedChat
 	}
 
-	httpapi.Write(ctx, rw, http.StatusOK, db2sdk.Chat(chat, nil, nil))
+	response, err := api.convertChatWithOwner(ctx, chat, nil, nil)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Failed to fetch chat owner.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	httpapi.Write(ctx, rw, http.StatusOK, response)
 }
 
 // EXPERIMENTAL: this endpoint is experimental and is subject to change.
@@ -3526,7 +3560,15 @@ func (api *API) regenerateChatTitle(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpapi.Write(ctx, rw, http.StatusOK, db2sdk.Chat(updatedChat, nil, nil))
+	response, err := api.convertChatWithOwner(ctx, updatedChat, nil, nil)
+	if err != nil {
+		httpapi.Write(ctx, rw, http.StatusInternalServerError, codersdk.Response{
+			Message: "Failed to fetch chat owner.",
+			Detail:  err.Error(),
+		})
+		return
+	}
+	httpapi.Write(ctx, rw, http.StatusOK, response)
 }
 
 //nolint:revive // HTTP handler writes to ResponseWriter.

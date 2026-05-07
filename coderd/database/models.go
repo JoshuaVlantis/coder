@@ -227,6 +227,11 @@ const (
 	ApiKeyScopeAiSeat                              APIKeyScope = "ai_seat:*"
 	ApiKeyScopeAiSeatCreate                        APIKeyScope = "ai_seat:create"
 	ApiKeyScopeAiSeatRead                          APIKeyScope = "ai_seat:read"
+	ApiKeyScopeUserSkillCreate                     APIKeyScope = "user_skill:create"
+	ApiKeyScopeUserSkillRead                       APIKeyScope = "user_skill:read"
+	ApiKeyScopeUserSkillUpdate                     APIKeyScope = "user_skill:update"
+	ApiKeyScopeUserSkillDelete                     APIKeyScope = "user_skill:delete"
+	ApiKeyScopeUserSkill                           APIKeyScope = "user_skill:*"
 )
 
 func (e *APIKeyScope) Scan(src interface{}) error {
@@ -473,7 +478,12 @@ func (e APIKeyScope) Valid() bool {
 		ApiKeyScopeChat,
 		ApiKeyScopeAiSeat,
 		ApiKeyScopeAiSeatCreate,
-		ApiKeyScopeAiSeatRead:
+		ApiKeyScopeAiSeatRead,
+		ApiKeyScopeUserSkillCreate,
+		ApiKeyScopeUserSkillRead,
+		ApiKeyScopeUserSkillUpdate,
+		ApiKeyScopeUserSkillDelete,
+		ApiKeyScopeUserSkill:
 		return true
 	}
 	return false
@@ -689,6 +699,11 @@ func AllAPIKeyScopeValues() []APIKeyScope {
 		ApiKeyScopeAiSeat,
 		ApiKeyScopeAiSeatCreate,
 		ApiKeyScopeAiSeatRead,
+		ApiKeyScopeUserSkillCreate,
+		ApiKeyScopeUserSkillRead,
+		ApiKeyScopeUserSkillUpdate,
+		ApiKeyScopeUserSkillDelete,
+		ApiKeyScopeUserSkill,
 	}
 }
 
@@ -3216,6 +3231,7 @@ const (
 	ResourceTypeAiSeat                      ResourceType = "ai_seat"
 	ResourceTypeChat                        ResourceType = "chat"
 	ResourceTypeUserSecret                  ResourceType = "user_secret"
+	ResourceTypeUserSkill                   ResourceType = "user_skill"
 )
 
 func (e *ResourceType) Scan(src interface{}) error {
@@ -3283,7 +3299,8 @@ func (e ResourceType) Valid() bool {
 		ResourceTypeTask,
 		ResourceTypeAiSeat,
 		ResourceTypeChat,
-		ResourceTypeUserSecret:
+		ResourceTypeUserSecret,
+		ResourceTypeUserSkill:
 		return true
 	}
 	return false
@@ -3320,6 +3337,7 @@ func AllResourceTypeValues() []ResourceType {
 		ResourceTypeAiSeat,
 		ResourceTypeChat,
 		ResourceTypeUserSecret,
+		ResourceTypeUserSkill,
 	}
 }
 
@@ -5522,6 +5540,16 @@ type UserSecret struct {
 	CreatedAt   time.Time      `db:"created_at" json:"created_at"`
 	UpdatedAt   time.Time      `db:"updated_at" json:"updated_at"`
 	ValueKeyID  sql.NullString `db:"value_key_id" json:"value_key_id"`
+}
+
+type UserSkill struct {
+	ID          uuid.UUID `db:"id" json:"id"`
+	UserID      uuid.UUID `db:"user_id" json:"user_id"`
+	Name        string    `db:"name" json:"name"`
+	Description string    `db:"description" json:"description"`
+	Content     string    `db:"content" json:"content"`
+	CreatedAt   time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt   time.Time `db:"updated_at" json:"updated_at"`
 }
 
 // Tracks the history of user status changes

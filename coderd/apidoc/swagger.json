@@ -13102,6 +13102,11 @@
 				"user_secret:delete",
 				"user_secret:read",
 				"user_secret:update",
+				"user_skill:*",
+				"user_skill:create",
+				"user_skill:delete",
+				"user_skill:read",
+				"user_skill:update",
 				"webpush_subscription:*",
 				"webpush_subscription:create",
 				"webpush_subscription:delete",
@@ -13314,6 +13319,11 @@
 				"APIKeyScopeUserSecretDelete",
 				"APIKeyScopeUserSecretRead",
 				"APIKeyScopeUserSecretUpdate",
+				"APIKeyScopeUserSkillAll",
+				"APIKeyScopeUserSkillCreate",
+				"APIKeyScopeUserSkillDelete",
+				"APIKeyScopeUserSkillRead",
+				"APIKeyScopeUserSkillUpdate",
 				"APIKeyScopeWebpushSubscriptionAll",
 				"APIKeyScopeWebpushSubscriptionCreate",
 				"APIKeyScopeWebpushSubscriptionDelete",
@@ -19508,6 +19518,7 @@
 				"usage_event",
 				"user",
 				"user_secret",
+				"user_skill",
 				"webpush_subscription",
 				"workspace",
 				"workspace_agent_devcontainers",
@@ -19555,6 +19566,7 @@
 				"ResourceUsageEvent",
 				"ResourceUser",
 				"ResourceUserSecret",
+				"ResourceUserSkill",
 				"ResourceWebpushSubscription",
 				"ResourceWorkspace",
 				"ResourceWorkspaceAgentDevcontainers",
@@ -19763,7 +19775,8 @@
 				"task",
 				"ai_seat",
 				"chat",
-				"user_secret"
+				"user_secret",
+				"user_skill"
 			],
 			"x-enum-varnames": [
 				"ResourceTypeTemplate",
@@ -19794,7 +19807,8 @@
 				"ResourceTypeTask",
 				"ResourceTypeAISeat",
 				"ResourceTypeChat",
-				"ResourceTypeUserSecret"
+				"ResourceTypeUserSecret",
+				"ResourceTypeUserSkill"
 			]
 		},
 		"codersdk.Response": {

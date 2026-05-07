@@ -223,7 +223,12 @@ CREATE TYPE api_key_scope AS ENUM (
     'chat:*',
     'ai_seat:*',
     'ai_seat:create',
-    'ai_seat:read'
+    'ai_seat:read',
+    'user_skill:create',
+    'user_skill:read',
+    'user_skill:update',
+    'user_skill:delete',
+    'user_skill:*'
 );
 
 CREATE TYPE app_sharing_level AS ENUM (
@@ -530,7 +535,8 @@ CREATE TYPE resource_type AS ENUM (
     'task',
     'ai_seat',
     'chat',
-    'user_secret'
+    'user_secret',
+    'user_skill'
 );
 
 CREATE TYPE shareable_workspace_owners AS ENUM (
@@ -2855,6 +2861,16 @@ CREATE TABLE user_secrets (
     value_key_id text
 );
 
+CREATE TABLE user_skills (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    name text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    content text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE user_status_changes (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     user_id uuid NOT NULL,
@@ -3634,6 +3650,9 @@ ALTER TABLE ONLY user_links
 ALTER TABLE ONLY user_secrets
     ADD CONSTRAINT user_secrets_pkey PRIMARY KEY (id);
 
+ALTER TABLE ONLY user_skills
+    ADD CONSTRAINT user_skills_pkey PRIMARY KEY (id);
+
 ALTER TABLE ONLY user_status_changes
     ADD CONSTRAINT user_status_changes_pkey PRIMARY KEY (id);
 
@@ -3959,6 +3978,10 @@ CREATE UNIQUE INDEX user_secrets_user_env_name_idx ON user_secrets USING btree (
 CREATE UNIQUE INDEX user_secrets_user_file_path_idx ON user_secrets USING btree (user_id, file_path) WHERE (file_path <> ''::text);
 
 CREATE UNIQUE INDEX user_secrets_user_name_idx ON user_secrets USING btree (user_id, name);
+
+CREATE INDEX user_skills_user_id_idx ON user_skills USING btree (user_id);
+
+CREATE UNIQUE INDEX user_skills_user_id_name_idx ON user_skills USING btree (user_id, name);
 
 CREATE UNIQUE INDEX users_email_lower_idx ON users USING btree (lower(email)) WHERE ((deleted = false) AND (email <> ''::text));
 
@@ -4394,6 +4417,9 @@ ALTER TABLE ONLY user_secrets
 
 ALTER TABLE ONLY user_secrets
     ADD CONSTRAINT user_secrets_value_key_id_fkey FOREIGN KEY (value_key_id) REFERENCES dbcrypt_keys(active_key_digest);
+
+ALTER TABLE ONLY user_skills
+    ADD CONSTRAINT user_skills_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
 
 ALTER TABLE ONLY user_status_changes
     ADD CONSTRAINT user_status_changes_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id);

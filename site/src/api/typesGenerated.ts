@@ -1683,7 +1683,6 @@ export interface ChatFileMetadata {
 export interface ChatFilePart {
 	readonly type: "file";
 	readonly media_type: string;
-	readonly name?: string;
 	readonly data?: string;
 	readonly file_id?: string;
 }
@@ -2736,6 +2735,7 @@ export interface ConnectionLogsRequest extends Pagination {
 
 // From codersdk/connectionlog.go
 export type ConnectionType =
+	| "desktop"
 	| "jetbrains"
 	| "port_forwarding"
 	| "reconnecting_pty"
@@ -2744,6 +2744,7 @@ export type ConnectionType =
 	| "workspace_app";
 
 export const ConnectionTypes: ConnectionType[] = [
+	"desktop",
 	"jetbrains",
 	"port_forwarding",
 	"reconnecting_pty",
@@ -3442,6 +3443,7 @@ export interface DLPPolicy {
 	readonly ssh_access: boolean;
 	readonly web_terminal_access: boolean;
 	readonly port_forwarding_access: boolean;
+	readonly desktop_access: boolean;
 	/**
 	 * AllowedApplications lists the `coder_app` slugs the workspace user is
 	 * permitted to access. Apps whose slugs are not in this list are blocked.
@@ -3655,6 +3657,7 @@ export const DiagnosticSeverityStrings: DiagnosticSeverityString[] = [
 
 // From codersdk/workspaceagents.go
 export type DisplayApp =
+	| "desktop"
 	| "port_forwarding_helper"
 	| "ssh_helper"
 	| "vscode"
@@ -3662,6 +3665,7 @@ export type DisplayApp =
 	| "web_terminal";
 
 export const DisplayApps: DisplayApp[] = [
+	"desktop",
 	"port_forwarding_helper",
 	"ssh_helper",
 	"vscode",

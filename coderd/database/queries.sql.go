@@ -10082,7 +10082,7 @@ func (q *sqlQuerier) RevokeDBCryptKey(ctx context.Context, activeKeyDigest strin
 
 const getTemplateVersionDLPPoliciesByTemplateVersionID = `-- name: GetTemplateVersionDLPPoliciesByTemplateVersionID :many
 SELECT
-	id, template_version_id, name, ssh_access, web_terminal_access, port_forwarding_access, allowed_applications, display_name, created_at
+	id, template_version_id, name, ssh_access, web_terminal_access, port_forwarding_access, allowed_applications, display_name, created_at, desktop_access
 FROM
 	template_version_dlp_policies
 WHERE
@@ -10108,6 +10108,7 @@ func (q *sqlQuerier) GetTemplateVersionDLPPoliciesByTemplateVersionID(ctx contex
 			pq.Array(&i.AllowedApplications),
 			&i.DisplayName,
 			&i.CreatedAt,
+			&i.DesktopAccess,
 		); err != nil {
 			return nil, err
 		}
@@ -10124,7 +10125,7 @@ func (q *sqlQuerier) GetTemplateVersionDLPPoliciesByTemplateVersionID(ctx contex
 
 const getTemplateVersionDLPPolicyByAgentID = `-- name: GetTemplateVersionDLPPolicyByAgentID :one
 SELECT
-	template_version_dlp_policies.id, template_version_dlp_policies.template_version_id, template_version_dlp_policies.name, template_version_dlp_policies.ssh_access, template_version_dlp_policies.web_terminal_access, template_version_dlp_policies.port_forwarding_access, template_version_dlp_policies.allowed_applications, template_version_dlp_policies.display_name, template_version_dlp_policies.created_at
+	template_version_dlp_policies.id, template_version_dlp_policies.template_version_id, template_version_dlp_policies.name, template_version_dlp_policies.ssh_access, template_version_dlp_policies.web_terminal_access, template_version_dlp_policies.port_forwarding_access, template_version_dlp_policies.allowed_applications, template_version_dlp_policies.display_name, template_version_dlp_policies.created_at, template_version_dlp_policies.desktop_access
 FROM
 	template_version_dlp_policies
 	INNER JOIN workspace_agents ON workspace_agents.dlp_policy_id = template_version_dlp_policies.id
@@ -10145,13 +10146,14 @@ func (q *sqlQuerier) GetTemplateVersionDLPPolicyByAgentID(ctx context.Context, a
 		pq.Array(&i.AllowedApplications),
 		&i.DisplayName,
 		&i.CreatedAt,
+		&i.DesktopAccess,
 	)
 	return i, err
 }
 
 const getTemplateVersionDLPPolicyByVersionAndName = `-- name: GetTemplateVersionDLPPolicyByVersionAndName :one
 SELECT
-	id, template_version_id, name, ssh_access, web_terminal_access, port_forwarding_access, allowed_applications, display_name, created_at
+	id, template_version_id, name, ssh_access, web_terminal_access, port_forwarding_access, allowed_applications, display_name, created_at, desktop_access
 FROM
 	template_version_dlp_policies
 WHERE
@@ -10177,6 +10179,7 @@ func (q *sqlQuerier) GetTemplateVersionDLPPolicyByVersionAndName(ctx context.Con
 		pq.Array(&i.AllowedApplications),
 		&i.DisplayName,
 		&i.CreatedAt,
+		&i.DesktopAccess,
 	)
 	return i, err
 }
@@ -10189,6 +10192,7 @@ INSERT INTO template_version_dlp_policies (
 	ssh_access,
 	web_terminal_access,
 	port_forwarding_access,
+	desktop_access,
 	allowed_applications,
 	display_name,
 	created_at
@@ -10202,8 +10206,9 @@ VALUES (
 	$6,
 	$7,
 	$8,
-	$9
-) RETURNING id, template_version_id, name, ssh_access, web_terminal_access, port_forwarding_access, allowed_applications, display_name, created_at
+	$9,
+	$10
+) RETURNING id, template_version_id, name, ssh_access, web_terminal_access, port_forwarding_access, allowed_applications, display_name, created_at, desktop_access
 `
 
 type InsertTemplateVersionDLPPolicyParams struct {
@@ -10213,6 +10218,7 @@ type InsertTemplateVersionDLPPolicyParams struct {
 	SshAccess            bool      `db:"ssh_access" json:"ssh_access"`
 	WebTerminalAccess    bool      `db:"web_terminal_access" json:"web_terminal_access"`
 	PortForwardingAccess bool      `db:"port_forwarding_access" json:"port_forwarding_access"`
+	DesktopAccess        bool      `db:"desktop_access" json:"desktop_access"`
 	AllowedApplications  []string  `db:"allowed_applications" json:"allowed_applications"`
 	DisplayName          string    `db:"display_name" json:"display_name"`
 	CreatedAt            time.Time `db:"created_at" json:"created_at"`
@@ -10226,6 +10232,7 @@ func (q *sqlQuerier) InsertTemplateVersionDLPPolicy(ctx context.Context, arg Ins
 		arg.SshAccess,
 		arg.WebTerminalAccess,
 		arg.PortForwardingAccess,
+		arg.DesktopAccess,
 		pq.Array(arg.AllowedApplications),
 		arg.DisplayName,
 		arg.CreatedAt,
@@ -10241,6 +10248,7 @@ func (q *sqlQuerier) InsertTemplateVersionDLPPolicy(ctx context.Context, arg Ins
 		pq.Array(&i.AllowedApplications),
 		&i.DisplayName,
 		&i.CreatedAt,
+		&i.DesktopAccess,
 	)
 	return i, err
 }

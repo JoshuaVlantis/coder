@@ -14924,7 +14924,8 @@ const docTemplate = `{
                 "jetbrains",
                 "reconnecting_pty",
                 "workspace_app",
-                "port_forwarding"
+                "port_forwarding",
+                "desktop"
             ],
             "x-enum-varnames": [
                 "ConnectionTypeSSH",
@@ -14932,7 +14933,8 @@ const docTemplate = `{
                 "ConnectionTypeJetBrains",
                 "ConnectionTypeReconnectingPTY",
                 "ConnectionTypeWorkspaceApp",
-                "ConnectionTypePortForwarding"
+                "ConnectionTypePortForwarding",
+                "ConnectionTypeDesktop"
             ]
         },
         "codersdk.ConvertLoginRequest": {
@@ -15815,6 +15817,9 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "desktop_access": {
+                    "type": "boolean"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -16182,14 +16187,16 @@ const docTemplate = `{
                 "vscode_insiders",
                 "web_terminal",
                 "port_forwarding_helper",
-                "ssh_helper"
+                "ssh_helper",
+                "desktop"
             ],
             "x-enum-varnames": [
                 "DisplayAppVSCodeDesktop",
                 "DisplayAppVSCodeInsiders",
                 "DisplayAppWebTerminal",
                 "DisplayAppPortForward",
-                "DisplayAppSSH"
+                "DisplayAppSSH",
+                "DisplayAppDesktop"
             ]
         },
         "codersdk.DynamicParametersRequest": {
@@ -24611,19 +24618,19 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "forceQuery": {
-                    "description": "append a query ('?') even if RawQuery is empty",
+                    "description": "ForceQuery indicates whether the original URL contained a query ('?') character.\nWhen set, the String method will include a trailing '?', even when RawQuery is empty.",
                     "type": "boolean"
                 },
                 "fragment": {
-                    "description": "fragment for references, without '#'",
+                    "description": "fragment for references (without '#')",
                     "type": "string"
                 },
                 "host": {
-                    "description": "host or host:port (see Hostname and Port methods)",
+                    "description": "\"host\" or \"host:port\" (see Hostname and Port methods)",
                     "type": "string"
                 },
                 "omitHost": {
-                    "description": "do not emit empty host (authority)",
+                    "description": "OmitHost indicates the URL has an empty host (authority).\nWhen set, the String method will not include the host when it is empty.",
                     "type": "boolean"
                 },
                 "opaque": {
@@ -24635,15 +24642,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "rawFragment": {
-                    "description": "encoded fragment hint (see EscapedFragment method)",
+                    "description": "RawFragment is an optional field containing an encoded fragment hint.\nSee the EscapedFragment method for more details.\n\nIn general, code should call EscapedFragment instead of reading RawFragment.",
                     "type": "string"
                 },
                 "rawPath": {
-                    "description": "encoded path hint (see EscapedPath method)",
+                    "description": "RawPath is an optional field containing an encoded path hint.\nSee the EscapedPath method for more details.\n\nIn general, code should call EscapedPath instead of reading RawPath.",
                     "type": "string"
                 },
                 "rawQuery": {
-                    "description": "encoded query values, without '?'",
+                    "description": "RawQuery contains the encoded query values, without the initial '?'.\nUse URL.Query to decode the query.",
                     "type": "string"
                 },
                 "scheme": {

@@ -2346,9 +2346,9 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 #### Enumerated Values
 
-| Value(s)                                                                             |
-|--------------------------------------------------------------------------------------|
-| `jetbrains`, `port_forwarding`, `reconnecting_pty`, `ssh`, `vscode`, `workspace_app` |
+| Value(s)                                                                                        |
+|-------------------------------------------------------------------------------------------------|
+| `desktop`, `jetbrains`, `port_forwarding`, `reconnecting_pty`, `ssh`, `vscode`, `workspace_app` |
 
 ## codersdk.ConvertLoginRequest
 
@@ -3185,6 +3185,7 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
   "allowed_applications": [
     "string"
   ],
+  "desktop_access": true,
   "name": "string",
   "port_forwarding_access": true,
   "ssh_access": true,
@@ -3197,6 +3198,7 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 | Name                     | Type            | Required | Restrictions | Description                                                                                                                                    |
 |--------------------------|-----------------|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | `allowed_applications`   | array of string | false    |              | Allowed applications lists the `coder_app` slugs the workspace user is permitted to access. Apps whose slugs are not in this list are blocked. |
+| `desktop_access`         | boolean         | false    |              |                                                                                                                                                |
 | `name`                   | string          | false    |              |                                                                                                                                                |
 | `port_forwarding_access` | boolean         | false    |              |                                                                                                                                                |
 | `ssh_access`             | boolean         | false    |              |                                                                                                                                                |
@@ -4483,9 +4485,9 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 
 #### Enumerated Values
 
-| Value(s)                                                                            |
-|-------------------------------------------------------------------------------------|
-| `port_forwarding_helper`, `ssh_helper`, `vscode`, `vscode_insiders`, `web_terminal` |
+| Value(s)                                                                                       |
+|------------------------------------------------------------------------------------------------|
+| `desktop`, `port_forwarding_helper`, `ssh_helper`, `vscode`, `vscode_insiders`, `web_terminal` |
 
 ## codersdk.DynamicParametersRequest
 
@@ -7327,6 +7329,7 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
               "allowed_applications": [
                 "string"
               ],
+              "desktop_access": true,
               "name": "string",
               "port_forwarding_access": true,
               "ssh_access": true,
@@ -8688,6 +8691,7 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
               "allowed_applications": [
                 "string"
               ],
+              "desktop_access": true,
               "name": "string",
               "port_forwarding_access": true,
               "ssh_access": true,
@@ -11676,6 +11680,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
               "allowed_applications": [
                 "string"
               ],
+              "desktop_access": true,
               "name": "string",
               "port_forwarding_access": true,
               "ssh_access": true,
@@ -11970,6 +11975,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
     "allowed_applications": [
       "string"
     ],
+    "desktop_access": true,
     "name": "string",
     "port_forwarding_access": true,
     "ssh_access": true,
@@ -12876,6 +12882,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
             "allowed_applications": [
               "string"
             ],
+            "desktop_access": true,
             "name": "string",
             "port_forwarding_access": true,
             "ssh_access": true,
@@ -13355,6 +13362,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
         "allowed_applications": [
           "string"
         ],
+        "desktop_access": true,
         "name": "string",
         "port_forwarding_access": true,
         "ssh_access": true,
@@ -13714,6 +13722,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
                   "allowed_applications": [
                     "string"
                   ],
+                  "desktop_access": true,
                   "name": "string",
                   "port_forwarding_access": true,
                   "ssh_access": true,
@@ -15484,19 +15493,21 @@ None
 
 ### Properties
 
-| Name          | Type                         | Required | Restrictions | Description                                        |
-|---------------|------------------------------|----------|--------------|----------------------------------------------------|
-| `forceQuery`  | boolean                      | false    |              | append a query ('?') even if RawQuery is empty     |
-| `fragment`    | string                       | false    |              | fragment for references, without '#'               |
-| `host`        | string                       | false    |              | host or host:port (see Hostname and Port methods)  |
-| `omitHost`    | boolean                      | false    |              | do not emit empty host (authority)                 |
-| `opaque`      | string                       | false    |              | encoded opaque data                                |
-| `path`        | string                       | false    |              | path (relative paths may omit leading slash)       |
-| `rawFragment` | string                       | false    |              | encoded fragment hint (see EscapedFragment method) |
-| `rawPath`     | string                       | false    |              | encoded path hint (see EscapedPath method)         |
-| `rawQuery`    | string                       | false    |              | encoded query values, without '?'                  |
-| `scheme`      | string                       | false    |              |                                                    |
-| `user`        | [url.Userinfo](#urluserinfo) | false    |              | username and password information                  |
+| Name         | Type    | Required | Restrictions | Description                                                                                                                                                            |
+|--------------|---------|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `forceQuery` | boolean | false    |              | Forcequery indicates whether the original URL contained a query ('?') character. When set, the String method will include a trailing '?', even when RawQuery is empty. |
+| `fragment`   | string  | false    |              | fragment for references (without '#')                                                                                                                                  |
+| `host`       | string  | false    |              | "host" or "host:port" (see Hostname and Port methods)                                                                                                                  |
+| `omitHost`   | boolean | false    |              | Omithost indicates the URL has an empty host (authority). When set, the String method will not include the host when it is empty.                                      |
+| `opaque`     | string  | false    |              | encoded opaque data                                                                                                                                                    |
+| `path`       | string  | false    |              | path (relative paths may omit leading slash)                                                                                                                           |
+|`rawFragment`|string|false||Rawfragment is an optional field containing an encoded fragment hint. See the EscapedFragment method for more details.
+In general, code should call EscapedFragment instead of reading RawFragment.|
+|`rawPath`|string|false||Rawpath is an optional field containing an encoded path hint. See the EscapedPath method for more details.
+In general, code should call EscapedPath instead of reading RawPath.|
+|`rawQuery`|string|false||Rawquery contains the encoded query values, without the initial '?'. Use URL.Query to decode the query.|
+|`scheme`|string|false|||
+|`user`|[url.Userinfo](#urluserinfo)|false||username and password information|
 
 ## serpent.ValueSource
 

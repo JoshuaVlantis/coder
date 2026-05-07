@@ -93,6 +93,7 @@ type agentDisplayAppsAttributes struct {
 	WebTerminal          bool `mapstructure:"web_terminal"`
 	SSHHelper            bool `mapstructure:"ssh_helper"`
 	PortForwardingHelper bool `mapstructure:"port_forwarding_helper"`
+	Desktop              bool `mapstructure:"desktop"`
 }
 
 // A mapping of attributes on the "coder_app" resource.
@@ -337,6 +338,7 @@ func ConvertState(ctx context.Context, modules []*tfjson.StateModule, rawGraph s
 				WebTerminal:          attrs.DisplayApps[0].WebTerminal,
 				PortForwardingHelper: attrs.DisplayApps[0].PortForwardingHelper,
 				SshHelper:            attrs.DisplayApps[0].SSHHelper,
+				Desktop:              attrs.DisplayApps[0].Desktop,
 			}
 		}
 
@@ -726,6 +728,7 @@ func ConvertState(ctx context.Context, modules []*tfjson.StateModule, rawGraph s
 			SshAccess:            attrs.SSHAccess,
 			WebTerminalAccess:    attrs.WebTerminalAccess,
 			PortForwardingAccess: attrs.PortForwardingAccess,
+			DesktopAccess:        attrs.DesktopAccess,
 			AllowedApplications:  attrs.AllowedApplications,
 		}
 		dlpPoliciesByID[attrs.ID] = policy

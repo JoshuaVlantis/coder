@@ -9332,7 +9332,6 @@
 				"produces": ["application/json"],
 				"tags": ["Agents"],
 				"summary": "Watch for workspace agent metadata updates via WebSockets",
-				"operationId": "watch-for-workspace-agent-metadata-updates-via-websockets",
 				"parameters": [
 					{
 						"type": "string",
@@ -9351,11 +9350,6 @@
 						}
 					}
 				},
-				"security": [
-					{
-						"CoderSessionToken": []
-					}
-				],
 				"x-apidocgen": {
 					"skip": true
 				}

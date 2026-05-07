@@ -14,7 +14,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/xerrors"
@@ -273,14 +272,13 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx := testutil.Context(t, testutil.WaitShort)
-		reg := prometheus.NewRegistry()
-		metrics := httpapi.NewWebsocketMetrics(reg, func(context.Context) string {
+		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
 			return "/test/path"
 		})
 
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
-		send, _, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), metrics)(writer, req)
+		send, _, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
 		require.NoError(t, err)
 
 		serverPayload := codersdk.ServerSentEvent{
@@ -304,13 +302,12 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx, cancel := context.WithCancel(testutil.Context(t, testutil.WaitShort))
-		reg := prometheus.NewRegistry()
-		metrics := httpapi.NewWebsocketMetrics(reg, func(context.Context) string {
+		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
 			return "/test/path"
 		})
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
-		_, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), metrics)(writer, req)
+		_, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
 		require.NoError(t, err)
 
 		successC := make(chan bool)
@@ -332,13 +329,12 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx := testutil.Context(t, testutil.WaitShort)
-		reg := prometheus.NewRegistry()
-		metrics := httpapi.NewWebsocketMetrics(reg, func(context.Context) string {
+		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
 			return "/test/path"
 		})
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
-		_, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), metrics)(writer, req)
+		_, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
 		require.NoError(t, err)
 
 		successC := make(chan bool)
@@ -366,13 +362,12 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx, cancel := context.WithCancel(testutil.Context(t, testutil.WaitShort))
-		reg := prometheus.NewRegistry()
-		metrics := httpapi.NewWebsocketMetrics(reg, func(context.Context) string {
+		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
 			return "/test/path"
 		})
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
-		send, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), metrics)(writer, req)
+		send, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
 		require.NoError(t, err)
 
 		successC := make(chan bool)
@@ -411,13 +406,12 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		timeout := hbDuration + (5 * time.Second)
 
 		ctx := testutil.Context(t, timeout)
-		reg := prometheus.NewRegistry()
-		metrics := httpapi.NewWebsocketMetrics(reg, func(context.Context) string {
+		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
 			return "/test/path"
 		})
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
-		_, _, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), metrics)(writer, req)
+		_, _, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
 		require.NoError(t, err)
 
 		type Result struct {

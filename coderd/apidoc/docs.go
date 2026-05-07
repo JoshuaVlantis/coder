@@ -10520,7 +10520,6 @@ const docTemplate = `{
                     "Agents"
                 ],
                 "summary": "Watch for workspace agent metadata updates via WebSockets",
-                "operationId": "watch-for-workspace-agent-metadata-updates-via-websockets",
                 "parameters": [
                     {
                         "type": "string",
@@ -10539,11 +10538,6 @@ const docTemplate = `{
                         }
                     }
                 },
-                "security": [
-                    {
-                        "CoderSessionToken": []
-                    }
-                ],
                 "x-apidocgen": {
                     "skip": true
                 }

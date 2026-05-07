@@ -9,6 +9,7 @@ import (
 
 	"cdr.dev/slog/v3"
 	"github.com/coder/coder/v2/coderd/httpapi"
+	"github.com/coder/coder/v2/coderd/httpmw"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/codersdk/wsjson"
 	"github.com/coder/websocket"
@@ -16,17 +17,19 @@ import (
 
 // API exposes the git watch HTTP routes for the agent.
 type API struct {
-	logger    slog.Logger
-	opts      []Option
-	pathStore *PathStore
+	logger          slog.Logger
+	opts            []Option
+	pathStore       *PathStore
+	heartbeatCloser *httpapi.HeartbeatCloser
 }
 
 // NewAPI creates a new git watch API.
 func NewAPI(logger slog.Logger, pathStore *PathStore, opts ...Option) *API {
 	return &API{
-		logger:    logger,
-		pathStore: pathStore,
-		opts:      opts,
+		logger:          logger,
+		pathStore:       pathStore,
+		opts:            opts,
+		heartbeatCloser: httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
 	}
 }
 
@@ -63,7 +66,7 @@ func (a *API) handleWatch(rw http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	go httpapi.HeartbeatClose(ctx, a.logger, nil, cancel, conn)
+	go a.heartbeatCloser.HeartbeatClose(ctx, a.logger, cancel, conn)
 
 	handler := NewHandler(a.logger, a.opts...)
 

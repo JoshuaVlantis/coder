@@ -1025,6 +1025,7 @@ export const MockWorkspaceAgent: TypesGen.WorkspaceAgent = {
 		"vscode",
 		"vscode_insiders",
 		"web_terminal",
+		"desktop",
 	],
 };
 
@@ -1043,6 +1044,7 @@ export const MockWorkspaceSubAgent: TypesGen.WorkspaceAgent = {
 		"vscode",
 		"vscode_insiders",
 		"web_terminal",
+		"desktop",
 	],
 };
 

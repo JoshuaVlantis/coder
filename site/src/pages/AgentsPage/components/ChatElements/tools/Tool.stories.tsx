@@ -46,6 +46,7 @@ export const ExecuteRunning: Story = {
 
 export const ExecuteSuccess: Story = {
 	args: {
+		shellToolDisplayMode: "auto",
 		result: {
 			output:
 				"From github.com:coder/coder\n * [new branch]      feature/agent-ui -> origin/feature/agent-ui",
@@ -54,6 +55,52 @@ export const ExecuteSuccess: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		expect(canvas.getByText(/From github\.com:coder\/coder/)).toBeVisible();
+	},
+};
+
+export const ExecuteAlwaysCollapsed: Story = {
+	args: {
+		name: "execute",
+		status: "completed",
+		args: { command: executeCommand },
+		shellToolDisplayMode: "always_collapsed",
+		result: {
+			output: "From github.com:coder/coder\nFetching origin/main",
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText(executeCommand)).toBeVisible();
+		expect(
+			canvas.queryByText(/From github\.com:coder\/coder/),
+		).not.toBeInTheDocument();
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Expand command output" }),
+		);
+		await waitFor(() => {
+			expect(canvas.getByText(/From github\.com:coder\/coder/)).toBeVisible();
+		});
+	},
+};
+
+export const ProcessOutputAlwaysCollapsed: Story = {
+	args: {
+		name: "process_output",
+		status: "completed",
+		shellToolDisplayMode: "always_collapsed",
+		result: {
+			output: "build completed\n0 errors",
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.queryByText(/build completed/)).not.toBeInTheDocument();
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Expand process output" }),
+		);
+		await waitFor(() => {
+			expect(canvas.getByText(/build completed/)).toBeVisible();
+		});
 	},
 };
 

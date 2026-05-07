@@ -23401,6 +23401,9 @@ const docTemplate = `{
                 "code_diff_display_mode": {
                     "$ref": "#/definitions/codersdk.AgentDisplayMode"
                 },
+                "shell_tool_display_mode": {
+                    "$ref": "#/definitions/codersdk.AgentDisplayMode"
+                },
                 "task_notification_alert_dismissed": {
                     "type": "boolean"
                 },
@@ -23872,6 +23875,9 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "code_diff_display_mode": {
+                    "$ref": "#/definitions/codersdk.AgentDisplayMode"
+                },
+                "shell_tool_display_mode": {
                     "$ref": "#/definitions/codersdk.AgentDisplayMode"
                 },
                 "task_notification_alert_dismissed": {

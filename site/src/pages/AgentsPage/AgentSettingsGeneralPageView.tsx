@@ -4,6 +4,7 @@ import type * as TypesGen from "#/api/typesGenerated";
 import { ChatFullWidthSettings } from "./components/ChatFullWidthSettings";
 import {
 	CodeDiffDisplaySettings,
+	ShellToolDisplaySettings,
 	ThinkingDisplaySettings,
 } from "./components/DisplayModeSettings";
 import { PersonalInstructionsSettings } from "./components/PersonalInstructionsSettings";
@@ -58,6 +59,7 @@ export const AgentSettingsGeneralPageView: FC<
 			/>
 			<ChatFullWidthSettings />
 			<ThinkingDisplaySettings />
+			<ShellToolDisplaySettings />
 			<CodeDiffDisplaySettings />
 			<UserChatDebugLoggingSettings
 				userSettings={userDebugLoggingData}

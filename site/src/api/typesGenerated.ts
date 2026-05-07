@@ -8358,6 +8358,7 @@ export interface UpdateUserPasswordRequest {
 export interface UpdateUserPreferenceSettingsRequest {
 	readonly task_notification_alert_dismissed?: boolean;
 	readonly thinking_display_mode?: ThinkingDisplayMode;
+	readonly shell_tool_display_mode?: AgentDisplayMode;
 	readonly code_diff_display_mode?: AgentDisplayMode;
 }
 
@@ -8736,6 +8737,7 @@ export interface UserParameter {
 export interface UserPreferenceSettings {
 	readonly task_notification_alert_dismissed: boolean;
 	readonly thinking_display_mode: ThinkingDisplayMode;
+	readonly shell_tool_display_mode: AgentDisplayMode;
 	readonly code_diff_display_mode: AgentDisplayMode;
 }
 

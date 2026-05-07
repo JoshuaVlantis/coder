@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useRef, useState } from "react";
+import type * as TypesGen from "#/api/typesGenerated";
 import { Button } from "#/components/Button/Button";
 import { CopyButton } from "#/components/CopyButton/CopyButton";
 import { ScrollArea } from "#/components/ScrollArea/ScrollArea";
@@ -20,35 +21,124 @@ import {
 } from "#/components/Tooltip/Tooltip";
 import { cn } from "#/utils/cn";
 import {
+	type AgentDisplayState,
+	resolveAgentDisplayState,
+} from "./displayMode";
+import { AgentDisplayModeToolCollapsible } from "./ToolCollapsible";
+import {
 	BORDER_BG_STYLE,
 	COLLAPSED_OUTPUT_HEIGHT,
 	signalTooltipLabel,
 	type ToolStatus,
 } from "./utils";
 
-/**
- * Specialized rendering for `execute` tool calls. Shows the command
- * in a terminal-style block with a copy button. Output is shown in a
- * collapsed preview (~3 lines) with an expand chevron at the bottom.
- */
-export const ExecuteTool: React.FC<{
+type ExecuteToolProps = {
 	command: string;
 	output: string;
 	status: ToolStatus;
 	isError: boolean;
 	isBackgrounded?: boolean;
 	killedBySignal?: "kill" | "terminate";
-}> = ({ command, output, status, isBackgrounded = false, killedBySignal }) => {
-	const [expanded, setExpanded] = useState(false);
+	shellToolDisplayMode?: TypesGen.AgentDisplayMode;
+};
+
+type ExecuteToolInnerProps = ExecuteToolProps & {
+	autoDisplayState: AgentDisplayState;
+	outputInitiallyExpanded: boolean;
+};
+
+export const ExecuteTool: React.FC<ExecuteToolProps> = (props) => {
+	const autoDisplayState: AgentDisplayState =
+		props.output.length > 0 ||
+		props.status === "running" ||
+		props.isBackgrounded ||
+		!!props.killedBySignal
+			? "preview"
+			: "collapsed";
+	const resolvedDisplayState = resolveAgentDisplayState(
+		props.shellToolDisplayMode,
+		autoDisplayState,
+	);
+	return (
+		<ExecuteToolInner
+			key={`${props.shellToolDisplayMode ?? "auto"}:${autoDisplayState}`}
+			{...props}
+			autoDisplayState={autoDisplayState}
+			outputInitiallyExpanded={resolvedDisplayState === "expanded"}
+		/>
+	);
+};
+
+const ExecuteToolInner: React.FC<ExecuteToolInnerProps> = ({
+	command,
+	output,
+	status,
+	isBackgrounded = false,
+	killedBySignal,
+	shellToolDisplayMode,
+	autoDisplayState,
+	outputInitiallyExpanded,
+}) => {
+	const hasOutput = output.length > 0;
+	const isRunning = status === "running";
+	const hasContent =
+		command.length > 0 ||
+		hasOutput ||
+		isRunning ||
+		isBackgrounded ||
+		!!killedBySignal;
+
+	return (
+		<AgentDisplayModeToolCollapsible
+			className="w-full"
+			hasContent={hasContent}
+			displayMode={shellToolDisplayMode}
+			autoDisplayState={autoDisplayState}
+			ariaLabel={(expanded) =>
+				expanded ? "Collapse command output" : "Expand command output"
+			}
+			header={
+				<div className="flex min-w-0 max-w-full items-center gap-2">
+					<span className="shrink-0 font-mono text-xs leading-5 text-content-secondary">
+						$
+					</span>
+					<code className="min-w-0 max-w-full truncate font-mono text-xs leading-5 text-content-primary">
+						{command}
+					</code>
+				</div>
+			}
+		>
+			<ExecuteToolCard
+				command={command}
+				output={output}
+				status={status}
+				isBackgrounded={isBackgrounded}
+				killedBySignal={killedBySignal}
+				outputInitiallyExpanded={outputInitiallyExpanded}
+			/>
+		</AgentDisplayModeToolCollapsible>
+	);
+};
+
+const ExecuteToolCard: React.FC<{
+	command: string;
+	output: string;
+	status: ToolStatus;
+	isBackgrounded: boolean;
+	killedBySignal?: "kill" | "terminate";
+	outputInitiallyExpanded: boolean;
+}> = ({
+	command,
+	output,
+	status,
+	isBackgrounded,
+	killedBySignal,
+	outputInitiallyExpanded,
+}) => {
+	const [expanded, setExpanded] = useState(outputInitiallyExpanded);
 	const outputRef = useRef<HTMLPreElement | null>(null);
 	const hasOutput = output.length > 0;
 	const isRunning = status === "running";
-
-	// Track whether the command text is truncated so we can offer
-	// a click-to-expand interaction. The ResizeObserver may clear
-	// commandOverflows while the text is wrapped, but
-	// canToggleCommand stays true via commandExpanded so the
-	// collapse affordance remains visible.
 	const [commandExpanded, setCommandExpanded] = useState(false);
 	const [commandOverflows, setCommandOverflows] = useState(false);
 	const canToggleCommand = commandOverflows || commandExpanded;
@@ -63,8 +153,6 @@ export const ExecuteTool: React.FC<{
 		return () => ro.disconnect();
 	};
 
-	// Check whether the output overflows the collapsed height so we
-	// know if we need to show the expand toggle at all.
 	const [overflows, setOverflows] = useState(false);
 	const measureRef = (node: HTMLPreElement | null) => {
 		outputRef.current = node;
@@ -74,8 +162,7 @@ export const ExecuteTool: React.FC<{
 	};
 
 	return (
-		<div className="group/exec w-full overflow-hidden rounded-md border border-solid border-border-default bg-surface-primary">
-			{/* Header: $ command + copy button */}
+		<div className="group/exec mt-1.5 w-full overflow-hidden rounded-md border border-solid border-border-default bg-surface-primary">
 			<div className="flex w-full items-start justify-between gap-2 px-3 py-2">
 				{/* biome-ignore lint/a11y/useKeyWithClickEvents: Click toggles for mouse users; keyboard users use the chevron button. */}
 				<div
@@ -152,13 +239,12 @@ export const ExecuteTool: React.FC<{
 					/>
 				</div>
 			</div>
-			{/* Output preview / expanded */}
 			{hasOutput && (
 				<>
 					<div className="h-px" style={BORDER_BG_STYLE} />
 					<ScrollArea
 						className="text-2xs"
-						viewportClassName={expanded ? "max-h-96" : ""}
+						viewportClassName={expanded ? "max-h-[80vh]" : ""}
 						scrollBarClassName="w-1.5"
 					>
 						<pre
@@ -177,7 +263,6 @@ export const ExecuteTool: React.FC<{
 						</pre>
 					</ScrollArea>
 
-					{/* Expand / collapse toggle at the bottom */}
 					{overflows && (
 						<button
 							type="button"

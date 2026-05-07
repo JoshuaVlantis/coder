@@ -80,6 +80,38 @@ func (t TemplateACL) Value() (driver.Value, error) {
 	return json.Marshal(t)
 }
 
+type ChatACL map[string]ChatACLEntry
+
+func (t *ChatACL) Scan(src interface{}) error {
+	switch v := src.(type) {
+	case string:
+		return json.Unmarshal([]byte(v), &t)
+	case []byte:
+		return json.Unmarshal(v, &t)
+	case json.RawMessage:
+		return json.Unmarshal(v, &t)
+	}
+
+	return xerrors.Errorf("unexpected type %T", src)
+}
+
+//nolint:revive
+func (c ChatACL) RBACACL() map[string][]policy.Action {
+	rbacACL := make(map[string][]policy.Action, len(c))
+	for id, entry := range c {
+		rbacACL[id] = entry.Permissions
+	}
+	return rbacACL
+}
+
+func (t ChatACL) Value() (driver.Value, error) {
+	return json.Marshal(t)
+}
+
+type ChatACLEntry struct {
+	Permissions []policy.Action `json:"permissions"`
+}
+
 type WorkspaceACL map[string]WorkspaceACLEntry
 
 func (t *WorkspaceACL) Scan(src interface{}) error {

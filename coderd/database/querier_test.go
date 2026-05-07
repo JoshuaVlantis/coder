@@ -1364,14 +1364,16 @@ func TestGetAuthorizedChats(t *testing.T) {
 
 		// OwnerID filter: member queries their own chats.
 		memberFilterSelf, err := db.GetAuthorizedChats(ctx, database.GetChatsParams{
-			OwnerID: member.ID,
+			OwnedOnly: true,
+			ViewerID:  member.ID,
 		}, preparedMember)
 		require.NoError(t, err)
 		require.Len(t, memberFilterSelf, 2)
 
 		// OwnerID filter: member queries owner's chats → sees 0.
 		memberFilterOwner, err := db.GetAuthorizedChats(ctx, database.GetChatsParams{
-			OwnerID: owner.ID,
+			OwnedOnly: true,
+			ViewerID:  owner.ID,
 		}, preparedMember)
 		require.NoError(t, err)
 		require.Len(t, memberFilterOwner, 0)
@@ -11410,7 +11412,8 @@ func TestChatLabels(t *testing.T) {
 		filterJSON, err := json.Marshal(database.StringMap{"env": "prod"})
 		require.NoError(t, err)
 		results, err := db.GetChats(ctx, database.GetChatsParams{
-			OwnerID: owner.ID,
+			OwnedOnly: true,
+			ViewerID:  owner.ID,
 			LabelFilter: pqtype.NullRawMessage{
 				RawMessage: filterJSON,
 				Valid:      true,
@@ -11430,7 +11433,8 @@ func TestChatLabels(t *testing.T) {
 		filterJSON, err = json.Marshal(database.StringMap{"env": "prod", "team": "backend"})
 		require.NoError(t, err)
 		results, err = db.GetChats(ctx, database.GetChatsParams{
-			OwnerID: owner.ID,
+			OwnedOnly: true,
+			ViewerID:  owner.ID,
 			LabelFilter: pqtype.NullRawMessage{
 				RawMessage: filterJSON,
 				Valid:      true,
@@ -11441,7 +11445,8 @@ func TestChatLabels(t *testing.T) {
 		require.Equal(t, "filter-a", results[0].Chat.Title)
 		// No filter — should return all chats for this owner.
 		allChats, err := db.GetChats(ctx, database.GetChatsParams{
-			OwnerID: owner.ID,
+			OwnedOnly: true,
+			ViewerID:  owner.ID,
 		})
 		require.NoError(t, err)
 		require.GreaterOrEqual(t, len(allChats), 3)
@@ -12848,7 +12853,8 @@ func TestChatHasUnread(t *testing.T) {
 
 	getHasUnread := func() bool {
 		rows, err := store.GetChats(ctx, database.GetChatsParams{
-			OwnerID: user.ID,
+			OwnedOnly: true,
+			ViewerID:  user.ID,
 		})
 		require.NoError(t, err)
 		for _, row := range rows {

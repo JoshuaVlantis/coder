@@ -712,7 +712,10 @@ func TestExploreSubagentIsReadOnly(t *testing.T) {
 	require.True(t, requestHasSystemSubstring(childRequests[0], "You are in Explore Mode as a delegated sub-agent."))
 	require.False(t, requestHasSystemSubstring(rootRequests[0], "You are in Explore Mode as a delegated sub-agent."))
 
-	rootChats, err := db.GetChats(dbauthz.AsChatd(ctx), database.GetChatsParams{OwnerID: user.UserID})
+	rootChats, err := db.GetChats(dbauthz.AsChatd(ctx), database.GetChatsParams{
+		OwnedOnly: true,
+		ViewerID:  user.UserID,
+	})
 	require.NoError(t, err)
 	rootIDs := make([]uuid.UUID, 0, len(rootChats))
 	for _, root := range rootChats {
@@ -2349,7 +2352,8 @@ func TestCreateChatRejectsWhenUsageLimitReached(t *testing.T) {
 	})
 
 	beforeChats, err := db.GetChats(ctx, database.GetChatsParams{
-		OwnerID:   user.ID,
+		OwnedOnly: true,
+		ViewerID:  user.ID,
 		AfterID:   uuid.Nil,
 		OffsetOpt: 0,
 		LimitOpt:  100,
@@ -2372,7 +2376,8 @@ func TestCreateChatRejectsWhenUsageLimitReached(t *testing.T) {
 	require.Equal(t, int64(100), limitErr.ConsumedMicros)
 
 	afterChats, err := db.GetChats(ctx, database.GetChatsParams{
-		OwnerID:   user.ID,
+		OwnedOnly: true,
+		ViewerID:  user.ID,
 		AfterID:   uuid.Nil,
 		OffsetOpt: 0,
 		LimitOpt:  100,

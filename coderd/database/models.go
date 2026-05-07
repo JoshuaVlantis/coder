@@ -227,6 +227,7 @@ const (
 	ApiKeyScopeAiSeat                              APIKeyScope = "ai_seat:*"
 	ApiKeyScopeAiSeatCreate                        APIKeyScope = "ai_seat:create"
 	ApiKeyScopeAiSeatRead                          APIKeyScope = "ai_seat:read"
+	ApiKeyScopeChatShare                           APIKeyScope = "chat:share"
 )
 
 func (e *APIKeyScope) Scan(src interface{}) error {
@@ -473,7 +474,8 @@ func (e APIKeyScope) Valid() bool {
 		ApiKeyScopeChat,
 		ApiKeyScopeAiSeat,
 		ApiKeyScopeAiSeatCreate,
-		ApiKeyScopeAiSeatRead:
+		ApiKeyScopeAiSeatRead,
+		ApiKeyScopeChatShare:
 		return true
 	}
 	return false
@@ -689,6 +691,7 @@ func AllAPIKeyScopeValues() []APIKeyScope {
 		ApiKeyScopeAiSeat,
 		ApiKeyScopeAiSeatCreate,
 		ApiKeyScopeAiSeatRead,
+		ApiKeyScopeChatShare,
 	}
 }
 
@@ -4381,6 +4384,8 @@ type Chat struct {
 	PlanMode            NullChatPlanMode      `db:"plan_mode" json:"plan_mode"`
 	ClientType          ChatClientType        `db:"client_type" json:"client_type"`
 	LastTurnSummary     sql.NullString        `db:"last_turn_summary" json:"last_turn_summary"`
+	UserACL             ChatACL               `db:"user_acl" json:"user_acl"`
+	GroupACL            ChatACL               `db:"group_acl" json:"group_acl"`
 }
 
 type ChatDebugRun struct {

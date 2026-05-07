@@ -1128,6 +1128,14 @@ func (m queryMetricsStore) GetAuthorizationUserRoles(ctx context.Context, userID
 	return r0, r1
 }
 
+func (m queryMetricsStore) GetChatACLByID(ctx context.Context, id uuid.UUID) (database.GetChatACLByIDRow, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetChatACLByID(ctx, id)
+	m.queryLatencies.WithLabelValues("GetChatACLByID").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetChatACLByID").Inc()
+	return r0, r1
+}
+
 func (m queryMetricsStore) GetChatAdvisorConfig(ctx context.Context) (string, error) {
 	start := time.Now()
 	r0, r1 := m.s.GetChatAdvisorConfig(ctx)
@@ -1533,6 +1541,14 @@ func (m queryMetricsStore) GetChats(ctx context.Context, arg database.GetChatsPa
 	r0, r1 := m.s.GetChats(ctx, arg)
 	m.queryLatencies.WithLabelValues("GetChats").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetChats").Inc()
+	return r0, r1
+}
+
+func (m queryMetricsStore) GetChatsByChatFileID(ctx context.Context, fileID uuid.UUID) ([]database.Chat, error) {
+	start := time.Now()
+	r0, r1 := m.s.GetChatsByChatFileID(ctx, fileID)
+	m.queryLatencies.WithLabelValues("GetChatsByChatFileID").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "GetChatsByChatFileID").Inc()
 	return r0, r1
 }
 
@@ -4477,6 +4493,14 @@ func (m queryMetricsStore) UpdateAPIKeyByID(ctx context.Context, arg database.Up
 	r0 := m.s.UpdateAPIKeyByID(ctx, arg)
 	m.queryLatencies.WithLabelValues("UpdateAPIKeyByID").Observe(time.Since(start).Seconds())
 	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpdateAPIKeyByID").Inc()
+	return r0
+}
+
+func (m queryMetricsStore) UpdateChatACLByID(ctx context.Context, arg database.UpdateChatACLByIDParams) error {
+	start := time.Now()
+	r0 := m.s.UpdateChatACLByID(ctx, arg)
+	m.queryLatencies.WithLabelValues("UpdateChatACLByID").Observe(time.Since(start).Seconds())
+	m.queryCounts.WithLabelValues(httpmw.ExtractHTTPRoute(ctx), httpmw.ExtractHTTPMethod(ctx), "UpdateChatACLByID").Inc()
 	return r0
 }
 

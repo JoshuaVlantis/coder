@@ -2602,6 +2602,17 @@ func (q *querier) GetAuthorizationUserRoles(ctx context.Context, userID uuid.UUI
 	return q.db.GetAuthorizationUserRoles(ctx, userID)
 }
 
+func (q *querier) GetChatACLByID(ctx context.Context, id uuid.UUID) (database.GetChatACLByIDRow, error) {
+	chat, err := q.db.GetChatByID(ctx, id)
+	if err != nil {
+		return database.GetChatACLByIDRow{}, err
+	}
+	if err := q.authorizeContext(ctx, policy.ActionRead, chat); err != nil {
+		return database.GetChatACLByIDRow{}, err
+	}
+	return q.db.GetChatACLByID(ctx, id)
+}
+
 func (q *querier) GetChatAdvisorConfig(ctx context.Context) (string, error) {
 	// The advisor configuration is a deployment-wide setting read by any
 	// authenticated chat user and by chatd when deciding whether to attach
@@ -2804,14 +2815,28 @@ func (q *querier) GetChatFileByID(ctx context.Context, id uuid.UUID) (database.C
 	if err != nil {
 		return database.ChatFile{}, err
 	}
-	if err := q.authorizeContext(ctx, policy.ActionRead, file); err != nil {
+	fileAuthErr := q.authorizeContext(ctx, policy.ActionRead, file)
+	if fileAuthErr == nil {
+		return file, nil
+	}
+
+	chats, err := q.db.GetChatsByChatFileID(ctx, id)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return database.ChatFile{}, err
 	}
-	return file, nil
+	for _, chat := range chats {
+		if err := q.authorizeContext(ctx, policy.ActionRead, chat); err == nil {
+			return file, nil
+		}
+	}
+	return database.ChatFile{}, fileAuthErr
 }
 
 func (q *querier) GetChatFileMetadataByChatID(ctx context.Context, chatID uuid.UUID) ([]database.GetChatFileMetadataByChatIDRow, error) {
-	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetChatFileMetadataByChatID)(ctx, chatID)
+	if _, err := q.GetChatByID(ctx, chatID); err != nil {
+		return nil, err
+	}
+	return q.db.GetChatFileMetadataByChatID(ctx, chatID)
 }
 
 func (q *querier) GetChatFilesByIDs(ctx context.Context, ids []uuid.UUID) ([]database.ChatFile, error) {
@@ -3073,6 +3098,10 @@ func (q *querier) GetChats(ctx context.Context, arg database.GetChatsParams) ([]
 		return nil, xerrors.Errorf("(dev error) prepare sql filter: %w", err)
 	}
 	return q.db.GetAuthorizedChats(ctx, arg, prep)
+}
+
+func (q *querier) GetChatsByChatFileID(ctx context.Context, fileID uuid.UUID) ([]database.Chat, error) {
+	return fetchWithPostFilter(q.auth, policy.ActionRead, q.db.GetChatsByChatFileID)(ctx, fileID)
 }
 
 func (q *querier) GetChatsByWorkspaceIDs(ctx context.Context, ids []uuid.UUID) ([]database.Chat, error) {
@@ -6217,6 +6246,14 @@ func (q *querier) UpdateAPIKeyByID(ctx context.Context, arg database.UpdateAPIKe
 		return q.db.GetAPIKeyByID(ctx, arg.ID)
 	}
 	return update(q.log, q.auth, fetch, q.db.UpdateAPIKeyByID)(ctx, arg)
+}
+
+func (q *querier) UpdateChatACLByID(ctx context.Context, arg database.UpdateChatACLByIDParams) error {
+	fetch := func(ctx context.Context, arg database.UpdateChatACLByIDParams) (database.Chat, error) {
+		return q.db.GetChatByID(ctx, arg.ID)
+	}
+
+	return fetchAndExec(q.log, q.auth, policy.ActionShare, fetch, q.db.UpdateChatACLByID)(ctx, arg)
 }
 
 func (q *querier) UpdateChatBuildAgentBinding(ctx context.Context, arg database.UpdateChatBuildAgentBindingParams) (database.Chat, error) {

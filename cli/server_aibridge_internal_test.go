@@ -47,6 +47,23 @@ func TestReadAIBridgeProvidersFromEnv(t *testing.T) {
 			},
 		},
 		{
+			name: "SingleProviderAIGatewayPrefix",
+			env: []string{
+				"CODER_AI_GATEWAY_PROVIDER_0_TYPE=anthropic",
+				"CODER_AI_GATEWAY_PROVIDER_0_NAME=anthropic-zdr",
+				"CODER_AI_GATEWAY_PROVIDER_0_KEY=sk-ant-xxx",
+				"CODER_AI_GATEWAY_PROVIDER_0_BASE_URL=https://api.anthropic.com/",
+			},
+			expected: []codersdk.AIBridgeProviderConfig{
+				{
+					Type:    aibridge.ProviderAnthropic,
+					Name:    "anthropic-zdr",
+					Keys:    []string{"sk-ant-xxx"},
+					BaseURL: "https://api.anthropic.com/",
+				},
+			},
+		},
+		{
 			name: "MultipleProvidersSameType",
 			env: []string{
 				"CODER_AIBRIDGE_PROVIDER_0_TYPE=anthropic",
@@ -339,7 +356,7 @@ func TestReadAIBridgeProvidersFromEnv(t *testing.T) {
 
 	t.Run("MultiDigitIndices", func(t *testing.T) {
 		t.Parallel()
-		// Indices 0, 1, 2, ..., 10 — verifies that 10 sorts after 2,
+		// Indices 0, 1, 2, ..., 10, verifies that 10 sorts after 2,
 		// not between 1 and 2 as a lexicographic sort would do.
 		var env []string
 		var expected []codersdk.AIBridgeProviderConfig
@@ -366,8 +383,8 @@ func TestReadAIBridgeProvidersFromEnv(t *testing.T) {
 		// the function logs a warning and continues.
 		sink := testutil.NewFakeSink(t)
 		providers, err := ReadAIBridgeProvidersFromEnv(sink.Logger(), []string{
-			"CODER_AIBRIDGE_PROVIDER_0_TYPE=openai",
-			"CODER_AIBRIDGE_PROVIDER_0_TPYE=openai",
+			"CODER_AI_GATEWAY_PROVIDER_0_TYPE=openai",
+			"CODER_AI_GATEWAY_PROVIDER_0_TPYE=openai",
 		})
 		require.NoError(t, err)
 		require.Equal(t, []codersdk.AIBridgeProviderConfig{
@@ -375,10 +392,10 @@ func TestReadAIBridgeProvidersFromEnv(t *testing.T) {
 		}, providers)
 
 		warnings := sink.Entries(func(e slog.SinkEntry) bool {
-			return e.Message == "ignoring unknown aibridge provider field (check for typos)"
+			return e.Message == "ignoring unknown ai_gateway provider field (check for typos)"
 		})
 		require.Len(t, warnings, 1)
 		require.Len(t, warnings[0].Fields, 1)
-		assert.Equal(t, "CODER_AIBRIDGE_PROVIDER_0_TPYE", warnings[0].Fields[0].Value)
+		assert.Equal(t, "CODER_AI_GATEWAY_PROVIDER_0_TPYE", warnings[0].Fields[0].Value)
 	})
 }

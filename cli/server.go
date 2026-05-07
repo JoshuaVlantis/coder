@@ -2926,11 +2926,14 @@ func parseExternalAuthProvidersFromEnv(prefix string, environ []string) ([]coder
 	return providers, nil
 }
 
-// ReadAIBridgeProvidersFromEnv parses CODER_AIBRIDGE_PROVIDER_<N>_<KEY>
+// ReadAIBridgeProvidersFromEnv parses CODER_AI_GATEWAY_PROVIDER_<N>_<KEY>
 // environment variables into a slice of AIBridgeProviderConfig.
+// Deprecated alias env vars with the CODER_AIBRIDGE_PROVIDER_<N>_<KEY>
+// prefix are also accepted for compatibility.
 // This follows the same indexed pattern as ReadExternalAuthProvidersFromEnv.
 func ReadAIBridgeProvidersFromEnv(logger slog.Logger, environ []string) ([]codersdk.AIBridgeProviderConfig, error) {
 	parsed := serpent.ParseEnviron(environ, "CODER_AIBRIDGE_PROVIDER_")
+	parsed = append(parsed, serpent.ParseEnviron(environ, "CODER_AI_GATEWAY_PROVIDER_")...)
 
 	// Sort by numeric index so that PROVIDER_2 comes before PROVIDER_10.
 	slices.SortFunc(parsed, func(a, b serpent.EnvVar) int {
@@ -3014,8 +3017,8 @@ func ReadAIBridgeProvidersFromEnv(logger slog.Logger, environ []string) ([]coder
 		case "BEDROCK_SMALL_FAST_MODEL":
 			provider.BedrockSmallFastModel = v.Value
 		default:
-			logger.Warn(context.Background(), "ignoring unknown aibridge provider field (check for typos)",
-				slog.F("env", fmt.Sprintf("CODER_AIBRIDGE_PROVIDER_%d_%s", providerNum, key)),
+			logger.Warn(context.Background(), "ignoring unknown ai_gateway provider field (check for typos)",
+				slog.F("env", fmt.Sprintf("CODER_AI_GATEWAY_PROVIDER_%d_%s", providerNum, key)),
 			)
 		}
 		providers[providerNum] = provider

@@ -3307,6 +3307,14 @@ export interface CreateUserSecretRequest {
 	readonly file_path?: string;
 }
 
+// From codersdk/userskills.go
+/**
+ * CreateUserSkillRequest is the payload for creating a user skill.
+ */
+export interface CreateUserSkillRequest {
+	readonly content: string;
+}
+
 // From codersdk/workspaces.go
 export type CreateWorkspaceBuildReason =
 	| "cli"
@@ -8395,6 +8403,14 @@ export interface UpdateUserSecretRequest {
 	readonly file_path?: string;
 }
 
+// From codersdk/userskills.go
+/**
+ * UpdateUserSkillRequest is the payload for updating a user skill.
+ */
+export interface UpdateUserSkillRequest {
+	readonly content: string;
+}
+
 // From codersdk/workspaces.go
 export interface UpdateWorkspaceACL {
 	/**
@@ -8783,6 +8799,31 @@ export interface UserSecret {
 	readonly description: string;
 	readonly env_name: string;
 	readonly file_path: string;
+	readonly created_at: string;
+	readonly updated_at: string;
+}
+
+// From codersdk/userskills.go
+/**
+ * UserSkill represents a user skill with its raw Markdown content.
+ */
+export interface UserSkill {
+	readonly id: string;
+	readonly name: string;
+	readonly description: string;
+	readonly content: string;
+	readonly created_at: string;
+	readonly updated_at: string;
+}
+
+// From codersdk/userskills.go
+/**
+ * UserSkillMetadata represents a user skill without its raw Markdown content.
+ */
+export interface UserSkillMetadata {
+	readonly id: string;
+	readonly name: string;
+	readonly description: string;
 	readonly created_at: string;
 	readonly updated_at: string;
 }

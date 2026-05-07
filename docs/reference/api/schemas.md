@@ -4725,6 +4725,20 @@ This is required on creation to enable a user-flow of validating a template work
 | `name`        | string | false    |              |             |
 | `value`       | string | false    |              |             |
 
+## codersdk.CreateUserSkillRequest
+
+```json
+{
+  "content": "string"
+}
+```
+
+### Properties
+
+| Name      | Type   | Required | Restrictions | Description |
+|-----------|--------|----------|--------------|-------------|
+| `content` | string | false    |              |             |
+
 ## codersdk.CreateWorkspaceBuildReason
 
 ```json
@@ -12871,6 +12885,20 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 | `file_path`   | string | false    |              |             |
 | `value`       | string | false    |              |             |
 
+## codersdk.UpdateUserSkillRequest
+
+```json
+{
+  "content": "string"
+}
+```
+
+### Properties
+
+| Name      | Type   | Required | Restrictions | Description |
+|-----------|--------|----------|--------------|-------------|
+| `content` | string | false    |              |             |
+
 ## codersdk.UpdateWorkspaceACL
 
 ```json
@@ -13467,6 +13495,52 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 | `description` | string | false    |              |             |
 | `env_name`    | string | false    |              |             |
 | `file_path`   | string | false    |              |             |
+| `id`          | string | false    |              |             |
+| `name`        | string | false    |              |             |
+| `updated_at`  | string | false    |              |             |
+
+## codersdk.UserSkill
+
+```json
+{
+  "content": "string",
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "name": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Properties
+
+| Name          | Type   | Required | Restrictions | Description |
+|---------------|--------|----------|--------------|-------------|
+| `content`     | string | false    |              |             |
+| `created_at`  | string | false    |              |             |
+| `description` | string | false    |              |             |
+| `id`          | string | false    |              |             |
+| `name`        | string | false    |              |             |
+| `updated_at`  | string | false    |              |             |
+
+## codersdk.UserSkillMetadata
+
+```json
+{
+  "created_at": "2019-08-24T14:15:22Z",
+  "description": "string",
+  "id": "497f6eca-6276-4993-bfeb-53cbbbba6f08",
+  "name": "string",
+  "updated_at": "2019-08-24T14:15:22Z"
+}
+```
+
+### Properties
+
+| Name          | Type   | Required | Restrictions | Description |
+|---------------|--------|----------|--------------|-------------|
+| `created_at`  | string | false    |              |             |
+| `description` | string | false    |              |             |
 | `id`          | string | false    |              |             |
 | `name`        | string | false    |              |             |
 | `updated_at`  | string | false    |              |             |

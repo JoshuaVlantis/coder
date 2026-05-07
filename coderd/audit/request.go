@@ -348,6 +348,9 @@ func ResourceRequiresOrgID[T Auditable]() bool {
 	case database.UserSecret:
 		// User secrets are global to the user across organizations.
 		return false
+	case database.UserSkill:
+		// User skills are global to the user across organizations.
+		return false
 	default:
 		panic(fmt.Sprintf("unknown resource %T for ResourceRequiresOrgID", tgt))
 	}

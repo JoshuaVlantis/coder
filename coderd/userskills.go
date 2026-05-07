@@ -82,7 +82,7 @@ func (api *API) postUserSkill(rw http.ResponseWriter, r *http.Request) {
 // @Success 200 {array} codersdk.UserSkillMetadata
 // @Router /api/experimental/users/{user}/skills [get]
 // @x-apidocgen {"skip": true}
-func (api *API) getUserSkills(rw http.ResponseWriter, r *http.Request) { //nolint:revive // Method name matches route.
+func (api *API) getUserSkills(rw http.ResponseWriter, r *http.Request) { //nolint:revive // This HTTP handler writes the route response directly.
 	ctx := r.Context()
 	user := httpmw.UserParam(r)
 
@@ -177,23 +177,25 @@ func (api *API) patchUserSkill(rw http.ResponseWriter, r *http.Request) {
 		Content:     req.Content,
 	}
 
-	var skill database.UserSkill
+	var (
+		skill    database.UserSkill
+		oldSkill database.UserSkill
+	)
 	err = api.Database.InTx(func(tx database.Store) error {
-		old, err := tx.GetUserSkillByUserIDAndName(ctx, database.GetUserSkillByUserIDAndNameParams{
+		fetched, err := tx.GetUserSkillByUserIDAndName(ctx, database.GetUserSkillByUserIDAndNameParams{
 			UserID: user.ID,
 			Name:   name,
 		})
 		if err != nil {
 			return xerrors.Errorf("fetch user skill: %w", err)
 		}
-		aReq.Old = old
 
 		updated, err := tx.UpdateUserSkillByUserIDAndName(ctx, params)
 		if err != nil {
 			return xerrors.Errorf("update user skill: %w", err)
 		}
+		oldSkill = fetched
 		skill = updated
-		aReq.New = updated
 		return nil
 	}, nil)
 	if err != nil {
@@ -204,6 +206,11 @@ func (api *API) patchUserSkill(rw http.ResponseWriter, r *http.Request) {
 		httpapi.InternalServerError(rw, err)
 		return
 	}
+
+	// Assign audit state after InTx returns so the audit log can never
+	// claim a rolled-back update was committed.
+	aReq.Old = oldSkill
+	aReq.New = skill
 
 	httpapi.Write(ctx, rw, http.StatusOK, convertUserSkill(skill))
 }

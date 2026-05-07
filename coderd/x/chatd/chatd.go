@@ -6071,8 +6071,14 @@ func userSkillContext(ctx context.Context, userID uuid.UUID) context.Context {
 		Roles: rbac.RoleIdentifiers{rbac.RoleMember()},
 		Scope: rbac.ScopeAll,
 	}.WithCachedASTValue()
-	//nolint:gocritic // Chat turns run asynchronously after admission. The
-	// chat owner is the only user whose personal skills are fetched here.
+	// Chat turns run asynchronously after admission, so the original request
+	// actor may no longer be available when a worker loads personal skills.
+	// We synthesize the chat owner as a member instead of reusing that actor.
+	// Hardcoding RoleMember is safe because dbauthz enforces
+	// ResourceUserSkill.WithOwner(userID), so this actor cannot read any other
+	// user's skills regardless of role. Org scoping is not needed because
+	// personal skills are user-scoped, not org-scoped.
+	//nolint:gocritic // The synthetic actor is intentional for the reasons above.
 	return dbauthz.As(ctx, actor)
 }
 
@@ -6082,6 +6088,9 @@ func (p *Server) fetchPersonalSkillMetadata(
 	logger slog.Logger,
 ) []skillspkg.Skill {
 	rows, err := p.db.ListUserSkillMetadataByUserID(userSkillContext(ctx, userID), userID)
+	// Per docs/adr/0001-personal-skills-db-backed-chatd-integration.md,
+	// metadata fetch failures intentionally degrade to an empty personal-skill
+	// list instead of failing the chat turn.
 	if err != nil {
 		logger.Warn(ctx, "failed to load personal skill metadata",
 			slog.F("owner_id", userID),

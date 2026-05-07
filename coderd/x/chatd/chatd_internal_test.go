@@ -3039,6 +3039,51 @@ func TestPersonalSkillsInSystemPrompt(t *testing.T) {
 	require.NotContains(t, text, `"skill"`)
 }
 
+func TestPersonalAndWorkspaceSkillCollisionInSystemPrompt(t *testing.T) {
+	t.Parallel()
+
+	resolved := mergeTurnSkills(
+		[]skillspkg.Skill{{
+			Name:        "deploy",
+			Description: "Personal deployment process",
+			Source:      skillspkg.SourcePersonal,
+		}},
+		[]chattool.SkillMeta{{
+			Name:        "deploy",
+			Description: "Workspace deployment process",
+			Dir:         "/skills/deploy",
+		}},
+	)
+	prompt := buildSystemPrompt(
+		nil,
+		"",
+		"",
+		resolved,
+		"",
+		systemPromptBehaviorContext{},
+	)
+
+	text := systemPromptText(t, prompt)
+	require.Contains(t, text, "<available-skills>")
+	require.Contains(t, text, "- personal/deploy: Personal deployment process")
+	require.Contains(t, text, "- workspace/deploy: Workspace deployment process")
+	require.NotContains(t, text, "\n- deploy: ")
+	require.NotContains(t, text, "\n- deploy\n")
+
+	personal, err := skillspkg.Lookup(resolved, "personal/deploy")
+	require.NoError(t, err)
+	require.Equal(t, "deploy", personal.Name)
+	require.Equal(t, skillspkg.SourcePersonal, personal.Source)
+
+	workspace, err := skillspkg.Lookup(resolved, "workspace/deploy")
+	require.NoError(t, err)
+	require.Equal(t, "deploy", workspace.Name)
+	require.Equal(t, skillspkg.SourceWorkspace, workspace.Source)
+
+	_, err = skillspkg.Lookup(resolved, "deploy")
+	require.ErrorIs(t, err, skillspkg.ErrSkillNotFound)
+}
+
 func TestFetchPersonalSkillMetadata(t *testing.T) {
 	t.Parallel()
 

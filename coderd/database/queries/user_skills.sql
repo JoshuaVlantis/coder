@@ -1,15 +1,10 @@
 -- name: InsertUserSkill :one
-INSERT INTO user_skills (
-    user_id,
-    name,
-    description,
-    content
-) VALUES (
-    @user_id,
-    @name,
-    @description,
-    @content
-) RETURNING *;
+INSERT INTO user_skills (user_id, name, description, content)
+SELECT @user_id::uuid, @name::text, @description::text, @content::text
+WHERE (
+    SELECT count(*) FROM user_skills WHERE user_id = @user_id::uuid
+) < @max_skills::int
+RETURNING *;
 
 -- name: GetUserSkillByUserIDAndName :one
 SELECT *

@@ -125,6 +125,17 @@ func TestUserSkillValidationAndConflicts(t *testing.T) {
 		})
 	}
 
+	t.Run("PatchEmptyBody", func(t *testing.T) {
+		patchValidationContent := userSkillMarkdown("patch-validation", "Valid", "Body.")
+		_, err := owner.CreateUserSkill(ctx, codersdk.Me, codersdk.CreateUserSkillRequest{Content: patchValidationContent})
+		require.NoError(t, err)
+		_, err = owner.UpdateUserSkill(ctx, codersdk.Me, "patch-validation", codersdk.UpdateUserSkillRequest{
+			Content: userSkillMarkdown("patch-validation", "Invalid", "   \n"),
+		})
+		sdkErr := requireSDKErrorStatus(t, err, http.StatusBadRequest)
+		assert.Equal(t, "Skill body is required.", sdkErr.Message)
+	})
+
 	sharedContent := userSkillMarkdown("shared-skill", "Shared", "Shared body.")
 	_, err := owner.CreateUserSkill(ctx, codersdk.Me, codersdk.CreateUserSkillRequest{Content: sharedContent})
 	require.NoError(t, err)

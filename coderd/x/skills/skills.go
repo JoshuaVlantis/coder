@@ -63,7 +63,7 @@ type ResolvedSkill struct {
 func ParsePersonalSkillMarkdown(raw []byte) (ParsedSkill, error) {
 	name, description, body, err := workspacesdk.ParseSkillFrontmatter(string(raw))
 	if err != nil {
-		if strings.Contains(err.Error(), "frontmatter missing required 'name' field") {
+		if xerrors.Is(err, workspacesdk.ErrFrontmatterNameRequired) {
 			return ParsedSkill{}, ErrInvalidSkillName
 		}
 		return ParsedSkill{}, xerrors.Errorf("parse skill frontmatter: %w", err)

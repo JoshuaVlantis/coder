@@ -2,6 +2,7 @@ package coderd
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 
@@ -54,29 +55,32 @@ func (api *API) postUserSkill(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	existingSkills, err := api.Database.ListUserSkillMetadataByUserID(ctx, user.ID)
-	if err != nil {
-		httpapi.InternalServerError(rw, err)
-		return
-	}
-	if len(existingSkills) >= skills.MaxPersonalSkillsPerUser {
-		httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
-			Message: "Personal skill limit reached.",
-			Detail: fmt.Sprintf(
-				"Each user can have at most %d personal skills.",
-				skills.MaxPersonalSkillsPerUser,
-			),
-		})
-		return
-	}
-
-	skill, err := api.Database.InsertUserSkill(ctx, database.InsertUserSkillParams{
+	params := database.InsertUserSkillParams{
 		UserID:      user.ID,
 		Name:        parsedSkill.Name,
 		Description: parsedSkill.Description,
 		Content:     req.Content,
+		MaxSkills:   int32(skills.MaxPersonalSkillsPerUser),
+	}
+	var skill database.UserSkill
+	// Serializable isolation makes the conditional count in InsertUserSkill
+	// retry when concurrent creates race for the same quota.
+	err = api.Database.InTx(func(tx database.Store) error {
+		inserted, err := tx.InsertUserSkill(ctx, params)
+		if err != nil {
+			return err
+		}
+		skill = inserted
+		return nil
+	}, &database.TxOptions{
+		Isolation:    sql.LevelSerializable,
+		TxIdentifier: "insert_user_skill",
 	})
 	if err != nil {
+		if xerrors.Is(err, sql.ErrNoRows) {
+			writeUserSkillLimitReached(ctx, rw)
+			return
+		}
 		if database.IsUniqueViolation(err, database.UniqueUserSkillsUserIDNameIndex) {
 			httpapi.Write(ctx, rw, http.StatusConflict, codersdk.Response{
 				Message: "A skill with that name already exists.",
@@ -276,6 +280,16 @@ func (api *API) deleteUserSkill(rw http.ResponseWriter, r *http.Request) {
 	aReq.Old = deleted
 
 	rw.WriteHeader(http.StatusNoContent)
+}
+
+func writeUserSkillLimitReached(ctx context.Context, rw http.ResponseWriter) {
+	httpapi.Write(ctx, rw, http.StatusForbidden, codersdk.Response{
+		Message: "Personal skill limit reached.",
+		Detail: fmt.Sprintf(
+			"Each user can have at most %d personal skills.",
+			skills.MaxPersonalSkillsPerUser,
+		),
+	})
 }
 
 func writeInvalidUserSkillContent(ctx context.Context, rw http.ResponseWriter, err error) {

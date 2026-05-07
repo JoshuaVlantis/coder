@@ -25344,17 +25344,12 @@ func (q *sqlQuerier) GetUserSkillByUserIDAndName(ctx context.Context, arg GetUse
 }
 
 const insertUserSkill = `-- name: InsertUserSkill :one
-INSERT INTO user_skills (
-    user_id,
-    name,
-    description,
-    content
-) VALUES (
-    $1,
-    $2,
-    $3,
-    $4
-) RETURNING id, user_id, name, description, content, created_at, updated_at
+INSERT INTO user_skills (user_id, name, description, content)
+SELECT $1::uuid, $2::text, $3::text, $4::text
+WHERE (
+    SELECT count(*) FROM user_skills WHERE user_id = $1::uuid
+) < $5::int
+RETURNING id, user_id, name, description, content, created_at, updated_at
 `
 
 type InsertUserSkillParams struct {
@@ -25362,6 +25357,7 @@ type InsertUserSkillParams struct {
 	Name        string    `db:"name" json:"name"`
 	Description string    `db:"description" json:"description"`
 	Content     string    `db:"content" json:"content"`
+	MaxSkills   int32     `db:"max_skills" json:"max_skills"`
 }
 
 func (q *sqlQuerier) InsertUserSkill(ctx context.Context, arg InsertUserSkillParams) (UserSkill, error) {
@@ -25370,6 +25366,7 @@ func (q *sqlQuerier) InsertUserSkill(ctx context.Context, arg InsertUserSkillPar
 		arg.Name,
 		arg.Description,
 		arg.Content,
+		arg.MaxSkills,
 	)
 	var i UserSkill
 	err := row.Scan(

@@ -3084,6 +3084,13 @@ func TestPersonalAndWorkspaceSkillCollisionInSystemPrompt(t *testing.T) {
 	require.ErrorIs(t, err, skillspkg.ErrSkillNotFound)
 }
 
+func requireUserSkillContextActor(ctx context.Context, t *testing.T, userID uuid.UUID) {
+	t.Helper()
+	actor, ok := dbauthz.ActorFromContext(ctx)
+	require.True(t, ok)
+	require.Equal(t, userID.String(), actor.ID)
+}
+
 func TestFetchPersonalSkillMetadata(t *testing.T) {
 	t.Parallel()
 
@@ -3098,9 +3105,7 @@ func TestFetchPersonalSkillMetadata(t *testing.T) {
 
 		db.EXPECT().ListUserSkillMetadataByUserID(gomock.Any(), userID).DoAndReturn(
 			func(ctx context.Context, gotUserID uuid.UUID) ([]database.ListUserSkillMetadataByUserIDRow, error) {
-				actor, ok := dbauthz.ActorFromContext(ctx)
-				require.True(t, ok)
-				require.Equal(t, userID.String(), actor.ID)
+				requireUserSkillContextActor(ctx, t, userID)
 				require.Equal(t, userID, gotUserID)
 				return []database.ListUserSkillMetadataByUserIDRow{{
 					UserID:      userID,
@@ -3154,11 +3159,17 @@ func TestLoadPersonalSkillBody(t *testing.T) {
 			Name:   "personal-review",
 		}
 
-		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).Return(database.UserSkill{
-			UserID:  userID,
-			Name:    "personal-review",
-			Content: "---\nname: personal-review\ndescription: Personal review process\n---\n\nUpdated instructions.\n",
-		}, nil)
+		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).DoAndReturn(
+			func(ctx context.Context, gotParams database.GetUserSkillByUserIDAndNameParams) (database.UserSkill, error) {
+				requireUserSkillContextActor(ctx, t, userID)
+				require.Equal(t, params, gotParams)
+				return database.UserSkill{
+					UserID:  userID,
+					Name:    "personal-review",
+					Content: "---\nname: personal-review\ndescription: Personal review process\n---\n\nUpdated instructions.\n",
+				}, nil
+			},
+		)
 
 		got, err := server.loadPersonalSkillBody(context.Background(), userID, "personal-review")
 		require.NoError(t, err)
@@ -3180,7 +3191,13 @@ func TestLoadPersonalSkillBody(t *testing.T) {
 			Name:   "missing-skill",
 		}
 
-		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).Return(database.UserSkill{}, sql.ErrNoRows)
+		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).DoAndReturn(
+			func(ctx context.Context, gotParams database.GetUserSkillByUserIDAndNameParams) (database.UserSkill, error) {
+				requireUserSkillContextActor(ctx, t, userID)
+				require.Equal(t, params, gotParams)
+				return database.UserSkill{}, sql.ErrNoRows
+			},
+		)
 
 		_, err := server.loadPersonalSkillBody(context.Background(), userID, "missing-skill")
 		require.ErrorIs(t, err, skillspkg.ErrSkillNotFound)
@@ -3200,7 +3217,13 @@ func TestLoadPersonalSkillBody(t *testing.T) {
 		}
 		dbErr := xerrors.New("database unavailable")
 
-		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).Return(database.UserSkill{}, dbErr)
+		db.EXPECT().GetUserSkillByUserIDAndName(gomock.Any(), params).DoAndReturn(
+			func(ctx context.Context, gotParams database.GetUserSkillByUserIDAndNameParams) (database.UserSkill, error) {
+				requireUserSkillContextActor(ctx, t, userID)
+				require.Equal(t, params, gotParams)
+				return database.UserSkill{}, dbErr
+			},
+		)
 
 		_, err := server.loadPersonalSkillBody(context.Background(), userID, "error-skill")
 

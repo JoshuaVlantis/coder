@@ -17,6 +17,10 @@ var SkillNamePattern = regexp.MustCompile(SkillNameRegex)
 // they don't leak into the LLM prompt.
 var markdownCommentRe = regexp.MustCompile(`<!--[\s\S]*?-->`)
 
+// ErrFrontmatterNameRequired is returned by ParseSkillFrontmatter when
+// the frontmatter is missing a required name field.
+var ErrFrontmatterNameRequired = xerrors.New("frontmatter missing required 'name' field")
+
 // ParseSkillFrontmatter extracts name, description, and the
 // remaining body from a skill meta file. The expected format is
 // YAML-ish frontmatter delimited by "---" lines:
@@ -71,9 +75,7 @@ func ParseSkillFrontmatter(content string) (name, description, body string, err 
 	}
 
 	if name == "" {
-		return "", "", "", xerrors.New(
-			"frontmatter missing required 'name' field",
-		)
+		return "", "", "", xerrors.Errorf("%w", ErrFrontmatterNameRequired)
 	}
 
 	// Everything after the closing delimiter is the body.

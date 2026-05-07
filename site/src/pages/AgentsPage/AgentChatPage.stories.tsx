@@ -8,6 +8,7 @@ import {
 	reactRouterParameters,
 } from "storybook-addon-remix-react-router";
 import { API } from "#/api/api";
+import { getAuthorizationKey } from "#/api/queries/authCheck";
 import {
 	chatDiffContentsKey,
 	chatKey,
@@ -20,7 +21,9 @@ import {
 import { workspaceByIdKey } from "#/api/queries/workspaces";
 import type * as TypesGen from "#/api/typesGenerated";
 import {
-	MockUserMember,
+	MockGroup,
+	MockOrganizationMember,
+	MockOrganizationMember2,
 	MockUserOwner,
 	MockWorkspace,
 } from "#/testHelpers/entities";
@@ -34,7 +37,7 @@ import AgentChatPage, { RIGHT_PANEL_OPEN_KEY } from "./AgentChatPage";
 import type { AgentsOutletContext } from "./AgentsPage";
 
 // ---------------------------------------------------------------------------
-// Layout wrapper – provides outlet context for the child route.
+// Layout wrapper, provides outlet context for the child route.
 // ---------------------------------------------------------------------------
 const AgentChatPageLayout: FC = () => {
 	const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -128,6 +131,7 @@ const baseChatFields = {
 	organization_id: "test-org-id",
 	owner_id: MockUserOwner.id,
 	owner_username: MockUserOwner.username,
+	owner_name: MockUserOwner.name,
 	workspace_id: mockWorkspace.id,
 	last_model_config_id: MODEL_CONFIG_ID,
 	mcp_server_ids: [],
@@ -160,6 +164,27 @@ index abc1234..def5678 100644
 -	fmt.Println("old line")
  }
 `;
+
+const buildChatAuthorizationQuery = (
+	chat: Pick<TypesGen.Chat, "owner_id" | "organization_id">,
+	key: string,
+	action: "share" | "update",
+	allowed: boolean,
+) => ({
+	key: getAuthorizationKey({
+		checks: {
+			[key]: {
+				object: {
+					resource_type: "chat",
+					owner_id: chat.owner_id,
+					organization_id: chat.organization_id,
+				},
+				action,
+			},
+		},
+	}),
+	data: { [key]: allowed },
+});
 
 /** Build `parameters.queries` entries for a given chat and messages. */
 const buildQueries = (
@@ -203,6 +228,12 @@ const buildQueries = (
 		{ key: chatModelsKey, data: mockModelCatalog },
 		{ key: chatModelConfigs().queryKey, data: mockModelConfigs },
 		{ key: mcpServerConfigsKey, data: [] },
+		buildChatAuthorizationQuery(
+			chat,
+			"canShareChat",
+			"share",
+			chat.owner_id === MockUserOwner.id && !chat.parent_chat_id,
+		),
 	];
 };
 
@@ -230,7 +261,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			text: "Here is a recap of every tool I have at my disposal, exercised against this workspace so each card type renders.",
 		},
 
-		// execute -- shell command output
+		// execute, shell command output
 		{
 			type: "tool-call",
 			tool_call_id: "every-execute",
@@ -250,7 +281,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// process_output -- background process output
+		// process_output, background process output
 		{
 			type: "tool-call",
 			tool_call_id: "every-process-output",
@@ -271,7 +302,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// process_signal -- signal sent to a background process
+		// process_signal, signal sent to a background process
 		{
 			type: "tool-call",
 			tool_call_id: "every-process-signal",
@@ -285,7 +316,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			result: { success: true, signal: "terminate" },
 		},
 
-		// read_file -- completed file read with content viewer
+		// read_file, completed file read with content viewer
 		{
 			type: "tool-call",
 			tool_call_id: "every-read-file",
@@ -307,7 +338,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// write_file -- completed file write with diff viewer
+		// write_file, completed file write with diff viewer
 		{
 			type: "tool-call",
 			tool_call_id: "every-write-file",
@@ -331,7 +362,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			result: { content: "wrote 6 lines" },
 		},
 
-		// edit_files -- completed multi-file edit
+		// edit_files, completed multi-file edit
 		{
 			type: "tool-call",
 			tool_call_id: "every-edit-files",
@@ -357,7 +388,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			result: { applied: 1 },
 		},
 
-		// list_templates -- completed template listing
+		// list_templates, completed template listing
 		{
 			type: "tool-call",
 			tool_call_id: "every-list-templates",
@@ -386,7 +417,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// read_template -- completed single-template read
+		// read_template, completed single-template read
 		{
 			type: "tool-call",
 			tool_call_id: "every-read-template",
@@ -402,7 +433,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// read_skill -- completed skill load
+		// read_skill, completed skill load
 		{
 			type: "tool-call",
 			tool_call_id: "every-read-skill",
@@ -428,7 +459,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// read_skill_file -- completed skill file fetch
+		// read_skill_file, completed skill file fetch
 		{
 			type: "tool-call",
 			tool_call_id: "every-read-skill-file",
@@ -448,7 +479,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// chat_summarized -- compaction summary card
+		// chat_summarized, compaction summary card
 		{
 			type: "tool-call",
 			tool_call_id: "every-summarized",
@@ -468,7 +499,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// ask_user_question -- completed clarification
+		// ask_user_question, completed clarification
 		{
 			type: "tool-call",
 			tool_call_id: "every-ask-user",
@@ -500,7 +531,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			result: { questions: [{ answer: "Incremental migrations" }] },
 		},
 
-		// propose_plan -- proposed plan with content
+		// propose_plan, proposed plan with content
 		{
 			type: "tool-call",
 			tool_call_id: "every-propose-plan",
@@ -524,7 +555,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// computer -- screenshot tool result with text fallback
+		// computer, screenshot tool result with text fallback
 		{
 			type: "tool-call",
 			tool_call_id: "every-computer",
@@ -542,7 +573,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// attach_file -- generic renderer with explicit attach label
+		// attach_file, generic renderer with explicit attach label
 		{
 			type: "tool-call",
 			tool_call_id: "every-attach-file",
@@ -556,7 +587,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			result: {},
 		},
 
-		// generic / MCP fallback -- unknown tool name with no server
+		// generic / MCP fallback, unknown tool name with no server
 		{
 			type: "tool-call",
 			tool_call_id: "every-generic",
@@ -645,7 +676,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// message_agent -- send a follow-up to a subagent
+		// message_agent, send a follow-up to a subagent
 		{
 			type: "tool-call",
 			tool_call_id: "every-message-agent",
@@ -663,7 +694,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// wait_agent -- wait for a subagent to finish
+		// wait_agent, wait for a subagent to finish
 		{
 			type: "tool-call",
 			tool_call_id: "every-wait-agent",
@@ -682,7 +713,7 @@ const EVERY_TOOL_ASSISTANT_TURN = {
 			},
 		},
 
-		// close_agent -- terminate a subagent
+		// close_agent, terminate a subagent
 		{
 			type: "tool-call",
 			tool_call_id: "every-close-agent",
@@ -764,7 +795,7 @@ export const WithMessageHistory: Story = {
 			},
 			{
 				messages: [
-					// -- Turn 1: user asks for a summary --
+					// Turn 1: user asks for a summary --
 					{
 						id: 1,
 						chat_id: CHAT_ID,
@@ -777,7 +808,7 @@ export const WithMessageHistory: Story = {
 							},
 						],
 					},
-					// -- Turn 2: assistant with headings, lists, table, blockquote --
+					// Turn 2: assistant with headings, lists, table, blockquote --
 					{
 						id: 2,
 						chat_id: CHAT_ID,
@@ -853,7 +884,7 @@ export const WithMessageHistory: Story = {
 							},
 						],
 					},
-					// -- Turn 3: user follow-up (long message) --
+					// Turn 3: user follow-up (long message) --
 					{
 						id: 3,
 						chat_id: CHAT_ID,
@@ -892,7 +923,7 @@ export const WithMessageHistory: Story = {
 							},
 						],
 					},
-					// -- Turn 4: assistant with code, table, nested list, task list --
+					// Turn 4: assistant with code, table, nested list, task list --
 					{
 						id: 4,
 						chat_id: CHAT_ID,
@@ -966,7 +997,7 @@ export const WithMessageHistory: Story = {
 							},
 						],
 					},
-					// -- Turn 5: user asks about middleware --
+					// Turn 5: user asks about middleware --
 					{
 						id: 5,
 						chat_id: CHAT_ID,
@@ -979,7 +1010,7 @@ export const WithMessageHistory: Story = {
 							},
 						],
 					},
-					// -- Turn 6: assistant with code, inline code, links, images, nested blockquote --
+					// Turn 6: assistant with code, inline code, links, images, nested blockquote --
 					{
 						id: 6,
 						chat_id: CHAT_ID,
@@ -1103,11 +1134,52 @@ export const WithMessageHistory: Story = {
 		expect(
 			await canvas.findByText("Markdown rendering showcase"),
 		).toBeVisible();
-		await waitFor(() =>
+		await waitFor(() => {
 			expect(
 				canvas.queryByText(/^This is not your chat/),
-			).not.toBeInTheDocument(),
-		);
+			).not.toBeInTheDocument();
+			expect(
+				canvas.queryByText(/^This chat is owned by/),
+			).not.toBeInTheDocument();
+		});
+	},
+};
+
+export const RootChatShareActionAvailable: Story = {
+	parameters: {
+		queries: buildQueries(
+			{
+				id: CHAT_ID,
+				...baseChatFields,
+				title: "Shareable root chat",
+				status: "completed",
+			},
+			{ messages: [], queued_messages: [], has_more: false },
+			{ diffUrl: undefined },
+		),
+	},
+	beforeEach: () => {
+		spyOn(API.experimental, "getChatACL").mockResolvedValue({
+			users: [],
+			groups: [],
+		});
+		spyOn(API.experimental, "updateChatACL").mockResolvedValue(undefined);
+		spyOn(API, "getOrganizationPaginatedMembers").mockResolvedValue({
+			members: [MockOrganizationMember, MockOrganizationMember2],
+			count: 2,
+		});
+		spyOn(API, "getGroupsByOrganization").mockResolvedValue([MockGroup]);
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		await userEvent.click(canvas.getByLabelText("Share chat"));
+		const body = within(document.body);
+		await waitFor(() => {
+			expect(body.getByText("Chat Sharing")).toBeVisible();
+		});
+		await waitFor(() => {
+			expect(body.getByText("No shared members or groups yet")).toBeVisible();
+		});
 	},
 };
 
@@ -1137,29 +1209,77 @@ export const AdminViewingOtherUserChat: Story = {
 					id: CHAT_ID,
 					...baseChatFields,
 					owner_id: "other-user-id",
+					owner_username: "OtherUser",
+					owner_name: "Other User",
 					title: "Other user's chat",
 					status: "completed",
 				},
 				{ messages: [], queued_messages: [], has_more: false },
 				{ diffUrl: undefined },
 			),
-			{
-				key: ["user", "other-user-id"],
-				data: {
-					...MockUserMember,
-					id: "other-user-id",
-					username: "OtherUser",
+			buildChatAuthorizationQuery(
+				{
+					owner_id: "other-user-id",
+					organization_id: baseChatFields.organization_id,
 				},
-			},
+				"canUpdateChat",
+				"update",
+				true,
+			),
 		],
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		const banner = await canvas.findByText(
-			"This is not your chat. Prompting here will use @OtherUser's identity.",
+			"This is not your chat. Prompting here will use Other User's identity.",
 		);
 		expect(banner).toBeVisible();
 		expect(banner).toHaveAttribute("role", "status");
+		expect(canvas.getByRole("textbox")).toHaveAttribute(
+			"aria-disabled",
+			"false",
+		);
+	},
+};
+
+export const SharedReadOnlyChat: Story = {
+	parameters: {
+		queries: [
+			...buildQueries(
+				{
+					id: CHAT_ID,
+					...baseChatFields,
+					owner_id: "other-user-id",
+					owner_username: "OtherUser",
+					owner_name: "Other User",
+					title: "Shared read-only chat",
+					status: "completed",
+				},
+				{ messages: [], queued_messages: [], has_more: false },
+				{ diffUrl: undefined },
+			),
+			buildChatAuthorizationQuery(
+				{
+					owner_id: "other-user-id",
+					organization_id: baseChatFields.organization_id,
+				},
+				"canUpdateChat",
+				"update",
+				false,
+			),
+		],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(
+			await canvas.findByText(
+				"This chat is owned by Other User. You have read-only access.",
+			),
+		).toBeVisible();
+		expect(canvas.getByRole("textbox")).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
 	},
 };
 
@@ -1171,6 +1291,8 @@ export const ArchivedOtherUserChat: Story = {
 				...baseChatFields,
 				archived: true,
 				owner_id: "other-user-id",
+				owner_username: "OtherUser",
+				owner_name: "Other User",
 				title: "Archived other user's chat",
 				status: "completed",
 			},
@@ -1185,6 +1307,9 @@ export const ArchivedOtherUserChat: Story = {
 		).toBeVisible();
 		expect(
 			canvas.queryByText(/^This is not your chat/),
+		).not.toBeInTheDocument();
+		expect(
+			canvas.queryByText(/^This chat is owned by/),
 		).not.toBeInTheDocument();
 	},
 };
@@ -1913,7 +2038,7 @@ export const SidebarWithSingleRepo: Story = {
 	},
 };
 /**
- * Streaming reasoning part via WebSocket — renders inline text.
+ * Streaming reasoning part via WebSocket, renders inline text.
  */
 export const StreamedReasoning: Story = {
 	parameters: {
@@ -1975,7 +2100,7 @@ export const WithEveryTool: Story = {
 			},
 			{
 				messages: [
-					// -- Turn 1: user kicks off the task --
+					// Turn 1: user kicks off the task --
 					{
 						id: 1,
 						chat_id: CHAT_ID,
@@ -1988,7 +2113,7 @@ export const WithEveryTool: Story = {
 							},
 						],
 					},
-					// -- Turn 2: previous assistant turn (completed) --
+					// Turn 2: previous assistant turn (completed) --
 					//    Establishes that the agent already inspected and patched
 					//    a couple of files before the streaming turn begins.
 					{
@@ -2062,7 +2187,7 @@ export const WithEveryTool: Story = {
 							},
 						],
 					},
-					// -- Turn 3: user asks for a tool-by-tool tour --
+					// Turn 3: user asks for a tool-by-tool tour --
 					{
 						id: 3,
 						chat_id: CHAT_ID,
@@ -2075,7 +2200,7 @@ export const WithEveryTool: Story = {
 							},
 						],
 					},
-					// -- Turn 4: assistant runs every tool exactly once --
+					// Turn 4: assistant runs every tool exactly once --
 					EVERY_TOOL_ASSISTANT_TURN,
 				],
 				queued_messages: [],

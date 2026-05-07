@@ -32,6 +32,7 @@ import { DesktopPanelContext } from "./components/ChatElements/tools/DesktopPane
 import type { PendingAttachment } from "./components/ChatPageContent";
 import { ChatPageInput, ChatPageTimeline } from "./components/ChatPageContent";
 import { ChatScrollContainer } from "./components/ChatScrollContainer";
+import { ChatSharingPopoverContent } from "./components/ChatSharingPopover";
 import { ChatTopBar } from "./components/ChatTopBar";
 import { GitPanel } from "./components/GitPanel/GitPanel";
 import { DebugPanel } from "./components/RightPanel/DebugPanel/DebugPanel";
@@ -87,7 +88,9 @@ interface AgentChatPageViewProps {
 	parentChat: TypesGen.Chat | undefined;
 	persistedError: ChatDetailError | undefined;
 	isArchived: boolean;
-	chatOwner: { id: string; username?: string } | undefined;
+	chatOwner: Pick<TypesGen.MinimalUser, "name" | "username"> | undefined;
+	canUpdateOtherUserChat: boolean;
+	canShareChat: boolean;
 	workspaceAgent?: TypesGen.WorkspaceAgent;
 	workspace?: TypesGen.Workspace;
 	chatBuildId?: string;
@@ -191,6 +194,8 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	persistedError,
 	isArchived,
 	chatOwner,
+	canUpdateOtherUserChat,
+	canShareChat,
 	workspaceAgent,
 	workspace,
 	chatBuildId,
@@ -250,6 +255,8 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 	lastInjectedContext,
 }) => {
 	const queryClient = useQueryClient();
+
+	const canOpenChatSharing = canShareChat && organizationId !== undefined;
 
 	// Wrap the git watcher refresh to also invalidate the cached
 	// remote/PR diff contents so the panel re-fetches from GitHub.
@@ -407,16 +414,16 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 		editing.editingMessageId !== null ||
 		editing.editingQueuedMessageID !== null;
 
+	const chatOwnerUsername = chatOwner?.username.trim();
 	const chatOwnerLabel =
-		chatOwner === undefined
-			? undefined
-			: chatOwner.username
-				? `@${chatOwner.username}`
-				: `owner ${chatOwner.id}`;
+		chatOwner?.name?.trim() ||
+		(chatOwnerUsername ? `@${chatOwnerUsername}` : undefined);
 	const chatOwnerWarning =
 		chatOwnerLabel === undefined
 			? undefined
-			: `This is not your chat. Prompting here will use ${chatOwnerLabel}'s identity.`;
+			: canUpdateOtherUserChat
+				? `This is not your chat. Prompting here will use ${chatOwnerLabel}'s identity.`
+				: `This chat is owned by ${chatOwnerLabel}. You have read-only access.`;
 
 	const titleElement = (
 		<title>
@@ -467,6 +474,17 @@ export const AgentChatPageView: FC<AgentChatPageViewProps> = ({
 								diffStatusData={diffStatusData}
 								isSidebarCollapsed={isSidebarCollapsed}
 								onToggleSidebarCollapsed={onToggleSidebarCollapsed}
+								chatSharingPopover={
+									canOpenChatSharing
+										? (open) => (
+												<ChatSharingPopoverContent
+													chatId={agentId}
+													organizationId={organizationId}
+													open={open}
+												/>
+											)
+										: undefined
+								}
 							/>
 							{chatOwnerWarning && !isArchived && (
 								<div

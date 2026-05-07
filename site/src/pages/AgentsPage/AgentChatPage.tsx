@@ -15,6 +15,7 @@ import {
 	watchWorkspace,
 } from "#/api/api";
 import { getErrorMessage, isApiError } from "#/api/errors";
+import { checkAuthorization } from "#/api/queries/authCheck";
 import { buildOptimisticEditedMessage } from "#/api/queries/chatMessageEdits";
 import {
 	chat,
@@ -37,7 +38,6 @@ import {
 	userCompactionThresholds,
 } from "#/api/queries/chats";
 import { deploymentSSHConfig } from "#/api/queries/deployment";
-import { user as userQuery } from "#/api/queries/users";
 import {
 	workspaceById,
 	workspaceByIdKey,
@@ -374,7 +374,7 @@ export function useConversationEditingState(deps: {
 		}
 	}, [editorInitialValue, inputValueRef]);
 
-	// -- History editing state --
+	// History editing state.
 	const [editingMessageId, setEditingMessageId] = useState<number | null>(null);
 	const [draftBeforeHistoryEdit, setDraftBeforeHistoryEdit] =
 		useState<ParsedDraft | null>(null);
@@ -425,7 +425,7 @@ export function useConversationEditingState(deps: {
 		setEditingFileBlocks([]);
 	};
 
-	// -- Queue editing state --
+	// Queue editing state.
 	const [editingQueuedMessageID, setEditingQueuedMessageID] = useState<
 		number | null
 	>(null);
@@ -562,7 +562,7 @@ export function useConversationEditingState(deps: {
 		serializedEditorStateRef.current = serializedEditorState;
 
 		// Don't overwrite the persisted draft while editing a
-		// history or queued message — the original draft (possibly
+		// history or queued message, the original draft (possibly
 		// containing file-reference chips) is saved in React state
 		// and should survive a cancel.
 		if (editingMessageId !== null || editingQueuedMessageID !== null) {
@@ -575,7 +575,7 @@ export function useConversationEditingState(deps: {
 				try {
 					localStorage.setItem(draftStorageKey, serializedEditorState);
 				} catch {
-					// QuotaExceededError — silently discard the draft.
+					// QuotaExceededError, silently discard the draft.
 				}
 			} else {
 				localStorage.removeItem(draftStorageKey);
@@ -879,17 +879,48 @@ const AgentChatPage: FC = () => {
 	const isArchived = chatRecord?.archived ?? false;
 	const isViewerNotOwner =
 		chatRecord !== undefined && currentUser.id !== chatRecord.owner_id;
-	const chatOwnerQuery = useQuery({
-		...userQuery(chatRecord?.owner_id ?? ""),
-		enabled: isViewerNotOwner && !isArchived,
+	const canUpdateOtherUserChatQuery = useQuery({
+		...checkAuthorization({
+			checks: {
+				canUpdateChat: {
+					object: {
+						resource_type: "chat",
+						owner_id: chatRecord?.owner_id ?? "",
+						organization_id: chatRecord?.organization_id ?? "",
+					},
+					action: "update",
+				},
+			},
+		}),
+		enabled: isViewerNotOwner && !isArchived && chatRecord !== undefined,
 	});
+	const canUpdateOtherUserChat = Boolean(
+		canUpdateOtherUserChatQuery.data?.canUpdateChat,
+	);
+	const isRootChat =
+		chatRecord !== undefined && getParentChatID(chatRecord) === undefined;
+	const canShareChatQuery = useQuery({
+		...checkAuthorization({
+			checks: {
+				canShareChat: {
+					object: {
+						resource_type: "chat",
+						owner_id: chatRecord?.owner_id ?? "",
+						organization_id: chatRecord?.organization_id ?? "",
+					},
+					action: "share",
+				},
+			},
+		}),
+		enabled: isRootChat,
+	});
+	const canShareChat =
+		isRootChat && Boolean(canShareChatQuery.data?.canShareChat);
 	const chatOwner =
-		isViewerNotOwner && chatRecord !== undefined
+		isViewerNotOwner && chatRecord?.owner_username
 			? {
-					id: chatRecord.owner_id,
-					...(chatOwnerQuery.data?.username
-						? { username: chatOwnerQuery.data.username }
-						: {}),
+					username: chatRecord.owner_username,
+					...(chatRecord.owner_name ? { name: chatRecord.owner_name } : {}),
 				}
 			: undefined;
 	const planModeEnabled = chatRecord?.plan_mode === "plan";
@@ -1125,7 +1156,10 @@ const AgentChatPage: FC = () => {
 	const isChatSettingsPending =
 		isUpdateChatPlanModePending || isUpdateChatWorkspacePending;
 	const isInputDisabled =
-		!hasModelOptions || isArchived || isChatSettingsPending;
+		!hasModelOptions ||
+		isArchived ||
+		isChatSettingsPending ||
+		(isViewerNotOwner && !canUpdateOtherUserChat);
 	const selectedWorkspaceId = chatQuery.data?.workspace_id ?? null;
 
 	const isWorkspaceLoading =
@@ -1543,6 +1577,8 @@ const AgentChatPage: FC = () => {
 			persistedError={persistedError}
 			isArchived={isArchived}
 			chatOwner={chatOwner}
+			canUpdateOtherUserChat={canUpdateOtherUserChat}
+			canShareChat={canShareChat}
 			workspace={workspace}
 			workspaceAgent={workspaceAgent}
 			chatBuildId={chatQuery.data?.build_id}
@@ -1608,7 +1644,7 @@ const AgentChatPage: FC = () => {
 
 // Keyed wrapper so that navigating between agents (changing the
 // :agentId param) fully remounts the component, resetting all
-// internal state — drafts, editing, queries — cleanly.
+// internal state, drafts, editing, and queries, cleanly.
 const KeyedAgentChatPage: FC = () => {
 	const { agentId } = useParams<{ agentId: string }>();
 	return <AgentChatPage key={agentId} />;

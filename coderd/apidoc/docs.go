@@ -10834,6 +10834,38 @@ const docTemplate = `{
                 ]
             }
         },
+        "/workspaceagents/{workspaceagent}/desktop": {
+            "get": {
+                "tags": [
+                    "Agents"
+                ],
+                "summary": "Open VNC desktop to workspace agent",
+                "operationId": "open-vnc-desktop-to-workspace-agent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Workspace agent ID",
+                        "name": "workspaceagent",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols"
+                    }
+                },
+                "security": [
+                    {
+                        "CoderSessionToken": []
+                    }
+                ],
+                "x-apidocgen": {
+                    "skip": true
+                }
+            }
+        },
         "/workspaceagents/{workspaceagent}/listening-ports": {
             "get": {
                 "produces": [
@@ -24829,12 +24861,14 @@ const docTemplate = `{
             "enum": [
                 "path",
                 "subdomain",
-                "terminal"
+                "terminal",
+                "desktop"
             ],
             "x-enum-varnames": [
                 "AccessMethodPath",
                 "AccessMethodSubdomain",
-                "AccessMethodTerminal"
+                "AccessMethodTerminal",
+                "AccessMethodDesktop"
             ]
         },
         "workspaceapps.IssueTokenRequest": {

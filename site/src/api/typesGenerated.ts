@@ -2601,6 +2601,7 @@ export interface ChatToolResultPart {
 	readonly tool_name?: string;
 	readonly mcp_server_config_id?: string;
 	readonly result?: Record<string, string>;
+	readonly result_delta?: string;
 	readonly is_error?: boolean;
 	readonly is_media?: boolean;
 	/**

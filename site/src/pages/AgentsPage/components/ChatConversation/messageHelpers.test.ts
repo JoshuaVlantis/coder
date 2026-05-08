@@ -1,152 +1,130 @@
 import { describe, expect, it } from "vitest";
+import type * as TypesGen from "#/api/typesGenerated";
 import { groupSequentialReadFileMessages } from "./messageHelpers";
-import type { MergedTool, ParsedMessageEntry } from "./types";
+import type {
+	MergedTool,
+	ParsedMessageContent,
+	ParsedMessageEntry,
+} from "./types";
 
 const baseMessage = {
 	chat_id: "chat",
 	created_at: "2026-03-10T00:00:00.000Z",
 } as const;
 
+const parsed = (
+	overrides: Partial<ParsedMessageContent> = {},
+): ParsedMessageContent => ({
+	markdown: "",
+	reasoning: "",
+	toolCalls: [],
+	toolResults: [],
+	tools: [],
+	blocks: [],
+	sources: [],
+	...overrides,
+});
+
+const entry = ({
+	messageID,
+	role = "assistant",
+	content = [],
+	parsedOverrides,
+}: {
+	messageID: number;
+	role?: TypesGen.ChatMessageRole;
+	content?: TypesGen.ChatMessagePart[];
+	parsedOverrides: Partial<ParsedMessageContent>;
+}): ParsedMessageEntry => ({
+	message: { ...baseMessage, id: messageID, role, content },
+	parsed: parsed(parsedOverrides),
+});
+
+const readFileArgs = (id: string) => ({ path: `${id}.ts` });
+
 const readFileTool = (id: string): MergedTool => ({
 	id,
 	name: "read_file",
-	args: { path: `${id}.ts` },
+	args: readFileArgs(id),
 	result: { content: id },
 	isError: false,
 	status: "completed",
 });
 
-const readFileToolResult = (toolID: string) => ({
-	id: toolID,
+const readFileToolResult = (id: string) => ({
+	id,
 	name: "read_file" as const,
-	result: { content: toolID },
+	result: { content: id },
 	isError: false,
 });
 
 const readFileMessage = (
 	messageID: number,
 	toolID: string,
-	parsedOverrides: Partial<ParsedMessageEntry["parsed"]> = {},
+	parsedOverrides: Partial<ParsedMessageContent> = {},
 ): ParsedMessageEntry => {
-	const args = { path: `${toolID}.ts` };
-	const tool = readFileTool(toolID);
-	return {
-		message: {
-			...baseMessage,
-			id: messageID,
-			role: "assistant",
-			content: [
-				{
-					type: "tool-call",
-					tool_call_id: toolID,
-					tool_name: "read_file",
-					args,
-				},
-			],
-		},
-		parsed: {
-			markdown: "",
-			reasoning: "",
+	const args = readFileArgs(toolID);
+	return entry({
+		messageID,
+		parsedOverrides: {
 			toolCalls: [{ id: toolID, name: "read_file", args }],
 			toolResults: [readFileToolResult(toolID)],
-			tools: [tool],
+			tools: [readFileTool(toolID)],
 			blocks: [{ type: "tool", id: toolID }],
-			sources: [],
 			...parsedOverrides,
 		},
-	};
+	});
 };
-
-const textMessage = (messageID: number, text: string): ParsedMessageEntry => ({
-	message: {
-		...baseMessage,
-		id: messageID,
-		role: "assistant",
-		content: [{ type: "text", text }],
-	},
-	parsed: {
-		markdown: text,
-		reasoning: "",
-		toolCalls: [],
-		toolResults: [],
-		tools: [],
-		blocks: [{ type: "response", text }],
-		sources: [],
-	},
-});
 
 const hiddenToolResultMessage = (
 	messageID: number,
 	toolID: string,
-): ParsedMessageEntry => ({
-	message: {
-		...baseMessage,
-		id: messageID,
+): ParsedMessageEntry =>
+	entry({
+		messageID,
 		role: "tool",
-		content: [
-			{
-				type: "tool-result",
-				tool_call_id: toolID,
-				tool_name: "read_file",
-				result: { content: toolID },
-			},
-		],
-	},
-	parsed: {
-		markdown: "",
-		reasoning: "",
-		toolCalls: [],
-		toolResults: [readFileToolResult(toolID)],
-		tools: [readFileTool(toolID)],
-		blocks: [{ type: "tool", id: toolID }],
-		sources: [],
-	},
-});
+		parsedOverrides: {
+			toolResults: [readFileToolResult(toolID)],
+			tools: [readFileTool(toolID)],
+			blocks: [{ type: "tool", id: toolID }],
+		},
+	});
+
+const textMessage = (messageID: number, text: string): ParsedMessageEntry =>
+	entry({
+		messageID,
+		content: [{ type: "text", text }],
+		parsedOverrides: {
+			markdown: text,
+			blocks: [{ type: "response", text }],
+		},
+	});
 
 const executeMessage = (messageID: number): ParsedMessageEntry => {
-	const args = { command: "pwd" };
 	const tool: MergedTool = {
 		id: "execute-1",
 		name: "execute",
-		args,
-		result: { output: "/home/coder" },
 		isError: false,
 		status: "completed",
 	};
-	return {
-		message: {
-			...baseMessage,
-			id: messageID,
-			role: "assistant",
-			content: [
-				{
-					type: "tool-call",
-					tool_call_id: tool.id,
-					tool_name: tool.name,
-					args,
-				},
-			],
-		},
-		parsed: {
-			markdown: "",
-			reasoning: "",
-			toolCalls: [{ id: tool.id, name: tool.name, args }],
-			toolResults: [],
+	return entry({
+		messageID,
+		parsedOverrides: {
+			toolCalls: [{ id: tool.id, name: tool.name }],
 			tools: [tool],
 			blocks: [{ type: "tool", id: tool.id }],
-			sources: [],
 		},
-	};
+	});
 };
 
 describe("groupSequentialReadFileMessages", () => {
 	it("returns a single read_file-only message unchanged", () => {
-		const entry = readFileMessage(1, "read-1");
+		const readFile = readFileMessage(1, "read-1");
 
-		const result = groupSequentialReadFileMessages([entry]);
+		const result = groupSequentialReadFileMessages([readFile]);
 
 		expect(result).toHaveLength(1);
-		expect(result[0]).toBe(entry);
+		expect(result[0]).toBe(readFile);
 	});
 
 	it("collapses read_file-only assistant messages across hidden tool results", () => {
@@ -189,40 +167,27 @@ describe("groupSequentialReadFileMessages", () => {
 		expect(result[2].parsed.blocks).toEqual([{ type: "tool", id: "read-2" }]);
 	});
 
-	it("does not collapse read_file messages with visible markdown", () => {
+	it.each([
+		["markdown", { markdown: "Visible markdown" }],
+		["reasoning", { reasoning: "Visible reasoning" }],
+		[
+			"sources",
+			{
+				sources: [
+					{ url: "https://example.com/read-2", title: "Read 2 source" },
+				],
+			},
+		],
+	] satisfies Array<
+		[string, Partial<ParsedMessageContent>]
+	>)("does not collapse read_file messages with visible %s", (_, overrides) => {
 		const result = groupSequentialReadFileMessages([
 			readFileMessage(1, "read-1"),
-			readFileMessage(2, "read-2", { markdown: "Visible markdown" }),
+			readFileMessage(2, "read-2", overrides),
 			readFileMessage(3, "read-3"),
 		]);
 
 		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
-		expect(result[1].parsed.markdown).toBe("Visible markdown");
-	});
-
-	it("does not collapse read_file messages with visible reasoning", () => {
-		const result = groupSequentialReadFileMessages([
-			readFileMessage(1, "read-1"),
-			readFileMessage(2, "read-2", { reasoning: "Visible reasoning" }),
-			readFileMessage(3, "read-3"),
-		]);
-
-		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
-		expect(result[1].parsed.reasoning).toBe("Visible reasoning");
-	});
-
-	it("does not collapse read_file messages with sources", () => {
-		const sources = [
-			{ url: "https://example.com/read-2", title: "Read 2 source" },
-		];
-		const result = groupSequentialReadFileMessages([
-			readFileMessage(1, "read-1"),
-			readFileMessage(2, "read-2", { sources }),
-			readFileMessage(3, "read-3"),
-		]);
-
-		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
-		expect(result[1].parsed.sources).toEqual(sources);
 	});
 
 	it("does not collapse read_file messages across another visible tool", () => {

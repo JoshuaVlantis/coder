@@ -90,9 +90,14 @@ const hiddenToolResultMessage = (
 		},
 	});
 
-const textMessage = (messageID: number, text: string): ParsedMessageEntry =>
+const textMessage = (
+	messageID: number,
+	text: string,
+	role: TypesGen.ChatMessageRole = "assistant",
+): ParsedMessageEntry =>
 	entry({
 		messageID,
+		role,
 		content: [{ type: "text", text }],
 		parsedOverrides: {
 			markdown: text,
@@ -155,10 +160,15 @@ describe("groupSequentialReadFileMessages", () => {
 		]);
 	});
 
-	it("does not collapse read_file messages across visible content", () => {
+	it.each([
+		["assistant", textMessage(2, "middle")],
+		["user", textMessage(2, "middle", "user")],
+	] satisfies Array<
+		[string, ParsedMessageEntry]
+	>)("does not collapse read_file messages across visible %s content", (_, message) => {
 		const result = groupSequentialReadFileMessages([
 			readFileMessage(1, "read-1"),
-			textMessage(2, "middle"),
+			message,
 			readFileMessage(3, "read-2"),
 		]);
 

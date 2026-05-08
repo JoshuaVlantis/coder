@@ -828,11 +828,6 @@ export interface AdvisorConfig {
 	 * its provider was disabled after the admin saved this config).
 	 */
 	readonly model_config_id: string;
-	/**
-	 * ReasoningEffort overlays provider reasoning effort on the advisor
-	 * call config when supported. Allowed: "", "low", "medium", "high".
-	 */
-	readonly reasoning_effort: string;
 }
 
 // From codersdk/workspacebuilds.go
@@ -843,6 +838,15 @@ export interface AgentConnectionTiming {
 	readonly workspace_agent_id: string;
 	readonly workspace_agent_name: string;
 }
+
+// From codersdk/users.go
+export type AgentDisplayMode = "always_collapsed" | "always_expanded" | "auto";
+
+export const AgentDisplayModes: AgentDisplayMode[] = [
+	"always_collapsed",
+	"always_expanded",
+	"auto",
+];
 
 // From codersdk/workspacebuilds.go
 export interface AgentScriptTiming {
@@ -881,6 +885,14 @@ export const AgentSubsystems: AgentSubsystem[] = [
 	"envbuilder",
 	"exectrace",
 ];
+
+// From codersdk/chats.go
+/**
+ * AnthropicInlineImageCapBytes is Anthropic's documented per-image
+ * wire limit; the same cap applies to Bedrock-hosted Claude. Other
+ * providers have no documented per-image cap.
+ */
+export const AnthropicInlineImageCapBytes = 5242880;
 
 // From codersdk/deployment.go
 export interface AppHostResponse {
@@ -1287,6 +1299,7 @@ export interface Chat {
 	readonly status: ChatStatus;
 	readonly plan_mode?: ChatPlanMode;
 	readonly last_error?: ChatError;
+	readonly last_turn_summary: string | null;
 	readonly diff_status?: ChatDiffStatus;
 	readonly created_at: string;
 	readonly updated_at: string;
@@ -2712,8 +2725,8 @@ export interface ChatUsageLimitStatus {
 // From codersdk/chats.go
 /**
  * ChatWatchEvent represents an event from the global chat watch stream.
- * It delivers lifecycle events (created, status change, title change)
- * for all of the authenticated user's chats. When Kind is
+ * It delivers lifecycle events (created, status change, summary change,
+ * title change) for all of the authenticated user's chats. When Kind is
  * ActionRequired, ToolCalls contains the pending dynamic tool
  * invocations the client must execute and submit back.
  */
@@ -2730,6 +2743,7 @@ export type ChatWatchEventKind =
 	| "deleted"
 	| "diff_status_change"
 	| "status_change"
+	| "summary_change"
 	| "title_change";
 
 export const ChatWatchEventKinds: ChatWatchEventKind[] = [
@@ -2738,6 +2752,7 @@ export const ChatWatchEventKinds: ChatWatchEventKind[] = [
 	"deleted",
 	"diff_status_change",
 	"status_change",
+	"summary_change",
 	"title_change",
 ];
 
@@ -3779,8 +3794,9 @@ export const DisplayApps: DisplayApp[] = [
 // From codersdk/parameters.go
 export interface DynamicParametersRequest {
 	/**
-	 * ID identifies the request. The response contains the same
-	 * ID so that the client can match it to the request.
+	 * ID identifies the request for response ordering. Websocket response
+	 * IDs are monotonically increasing and may exceed the request ID when
+	 * server-side events trigger additional renders.
 	 */
 	readonly id: number;
 	readonly inputs: Record<string, string>;
@@ -4559,9 +4575,12 @@ export interface IssueReconnectingPTYSignedTokenResponse {
 }
 
 // From codersdk/provisionerdaemons.go
-export type JobErrorCode = "REQUIRED_TEMPLATE_VARIABLES";
+export type JobErrorCode = "INSUFFICIENT_QUOTA" | "REQUIRED_TEMPLATE_VARIABLES";
 
-export const JobErrorCodes: JobErrorCode[] = ["REQUIRED_TEMPLATE_VARIABLES"];
+export const JobErrorCodes: JobErrorCode[] = [
+	"INSUFFICIENT_QUOTA",
+	"REQUIRED_TEMPLATE_VARIABLES",
+];
 
 // From codersdk/licenses.go
 export interface License {
@@ -4774,6 +4793,13 @@ export interface MatchedProvisioners {
  * this limit than to lower it.
  */
 export const MaxChatFileIDs = 20;
+
+// From codersdk/chats.go
+/**
+ * MaxChatFileSizeBytes is the upload-endpoint cap for chat
+ * attachments.
+ */
+export const MaxChatFileSizeBytes = 10485760;
 
 // From codersdk/usersecretvalidation.go
 /**
@@ -7912,11 +7938,6 @@ export interface UpdateAdvisorConfigRequest {
 	 * its provider was disabled after the admin saved this config).
 	 */
 	readonly model_config_id: string;
-	/**
-	 * ReasoningEffort overlays provider reasoning effort on the advisor
-	 * call config when supported. Allowed: "", "low", "medium", "high".
-	 */
-	readonly reasoning_effort: string;
 }
 
 // From codersdk/deployment.go
@@ -8337,6 +8358,7 @@ export interface UpdateUserPasswordRequest {
 export interface UpdateUserPreferenceSettingsRequest {
 	readonly task_notification_alert_dismissed?: boolean;
 	readonly thinking_display_mode?: ThinkingDisplayMode;
+	readonly code_diff_display_mode?: AgentDisplayMode;
 }
 
 // From codersdk/users.go
@@ -8714,6 +8736,7 @@ export interface UserParameter {
 export interface UserPreferenceSettings {
 	readonly task_notification_alert_dismissed: boolean;
 	readonly thinking_display_mode: ThinkingDisplayMode;
+	readonly code_diff_display_mode: AgentDisplayMode;
 }
 
 // From codersdk/deployment.go

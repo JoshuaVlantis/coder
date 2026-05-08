@@ -1431,6 +1431,20 @@
 | `workspace_agent_id`   | string                                       | false    |              |             |
 | `workspace_agent_name` | string                                       | false    |              |             |
 
+## codersdk.AgentDisplayMode
+
+```json
+"auto"
+```
+
+### Properties
+
+#### Enumerated Values
+
+| Value(s)                                      |
+|-----------------------------------------------|
+| `always_collapsed`, `always_expanded`, `auto` |
+
 ## codersdk.AgentScriptTiming
 
 ```json
@@ -2197,6 +2211,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
         }
       ],
       "last_model_config_id": "30ebb95f-c255-4759-9429-89aa4ec1554c",
+      "last_turn_summary": "string",
       "mcp_server_ids": [
         "497f6eca-6276-4993-bfeb-53cbbbba6f08"
       ],
@@ -2320,6 +2335,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
     }
   ],
   "last_model_config_id": "30ebb95f-c255-4759-9429-89aa4ec1554c",
+  "last_turn_summary": "string",
   "mcp_server_ids": [
     "497f6eca-6276-4993-bfeb-53cbbbba6f08"
   ],
@@ -2358,6 +2374,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 | `last_error`            | [codersdk.ChatError](#codersdkchaterror)                        | false    |              |                                                                                                                                                                                                                                                                            |
 | `last_injected_context` | array of [codersdk.ChatMessagePart](#codersdkchatmessagepart)   | false    |              | Last injected context holds the most recently persisted injected context parts (AGENTS.md files and skills). It is updated only when context changes, on first workspace attach or agent change.                                                                           |
 | `last_model_config_id`  | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
+| `last_turn_summary`     | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
 | `mcp_server_ids`        | array of string                                                 | false    |              |                                                                                                                                                                                                                                                                            |
 | `organization_id`       | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
 | `owner_id`              | string                                                          | false    |              |                                                                                                                                                                                                                                                                            |
@@ -3731,6 +3748,7 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
       }
     ],
     "last_model_config_id": "30ebb95f-c255-4759-9429-89aa4ec1554c",
+    "last_turn_summary": "string",
     "mcp_server_ids": [
       "497f6eca-6276-4993-bfeb-53cbbbba6f08"
     ],
@@ -3777,9 +3795,9 @@ AuthorizationObject can represent a "set" of objects, such as: all workspaces in
 
 #### Enumerated Values
 
-| Value(s)                                                                                       |
-|------------------------------------------------------------------------------------------------|
-| `action_required`, `created`, `deleted`, `diff_status_change`, `status_change`, `title_change` |
+| Value(s)                                                                                                         |
+|------------------------------------------------------------------------------------------------------------------|
+| `action_required`, `created`, `deleted`, `diff_status_change`, `status_change`, `summary_change`, `title_change` |
 
 ## codersdk.ConnectionLatency
 
@@ -6403,12 +6421,12 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 
 ### Properties
 
-| Name               | Type    | Required | Restrictions | Description                                                                                                  |
-|--------------------|---------|----------|--------------|--------------------------------------------------------------------------------------------------------------|
-| `id`               | integer | false    |              | ID identifies the request. The response contains the same ID so that the client can match it to the request. |
-| `inputs`           | object  | false    |              |                                                                                                              |
-| » `[any property]` | string  | false    |              |                                                                                                              |
-| `owner_id`         | string  | false    |              | Owner ID if uuid.Nil, it defaults to `codersdk.Me`                                                           |
+| Name               | Type    | Required | Restrictions | Description                                                                                                                                                                            |
+|--------------------|---------|----------|--------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `id`               | integer | false    |              | ID identifies the request for response ordering. Websocket response IDs are monotonically increasing and may exceed the request ID when server-side events trigger additional renders. |
+| `inputs`           | object  | false    |              |                                                                                                                                                                                        |
+| » `[any property]` | string  | false    |              |                                                                                                                                                                                        |
+| `owner_id`         | string  | false    |              | Owner ID if uuid.Nil, it defaults to `codersdk.Me`                                                                                                                                     |
 
 ## codersdk.DynamicParametersResponse
 
@@ -7482,9 +7500,9 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
 
 #### Enumerated Values
 
-| Value(s)                      |
-|-------------------------------|
-| `REQUIRED_TEMPLATE_VARIABLES` |
+| Value(s)                                            |
+|-----------------------------------------------------|
+| `INSUFFICIENT_QUOTA`, `REQUIRED_TEMPLATE_VARIABLES` |
 
 ## codersdk.License
 
@@ -10003,7 +10021,7 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
 
 | Property     | Value(s)                                                             |
 |--------------|----------------------------------------------------------------------|
-| `error_code` | `REQUIRED_TEMPLATE_VARIABLES`                                        |
+| `error_code` | `INSUFFICIENT_QUOTA`, `REQUIRED_TEMPLATE_VARIABLES`                  |
 | `status`     | `canceled`, `canceling`, `failed`, `pending`, `running`, `succeeded` |
 
 ## codersdk.ProvisionerJobInput
@@ -12803,6 +12821,7 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
 
 ```json
 {
+  "code_diff_display_mode": "auto",
   "task_notification_alert_dismissed": true,
   "thinking_display_mode": "auto"
 }
@@ -12812,6 +12831,7 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
 
 | Name                                | Type                                                         | Required | Restrictions | Description |
 |-------------------------------------|--------------------------------------------------------------|----------|--------------|-------------|
+| `code_diff_display_mode`            | [codersdk.AgentDisplayMode](#codersdkagentdisplaymode)       | false    |              |             |
 | `task_notification_alert_dismissed` | boolean                                                      | false    |              |             |
 | `thinking_display_mode`             | [codersdk.ThinkingDisplayMode](#codersdkthinkingdisplaymode) | false    |              |             |
 
@@ -13389,6 +13409,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 
 ```json
 {
+  "code_diff_display_mode": "auto",
   "task_notification_alert_dismissed": true,
   "thinking_display_mode": "auto"
 }
@@ -13398,6 +13419,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
 
 | Name                                | Type                                                         | Required | Restrictions | Description |
 |-------------------------------------|--------------------------------------------------------------|----------|--------------|-------------|
+| `code_diff_display_mode`            | [codersdk.AgentDisplayMode](#codersdkagentdisplaymode)       | false    |              |             |
 | `task_notification_alert_dismissed` | boolean                                                      | false    |              |             |
 | `thinking_display_mode`             | [codersdk.ThinkingDisplayMode](#codersdkthinkingdisplaymode) | false    |              |             |
 
@@ -17562,19 +17584,21 @@ None
 
 ### Properties
 
-| Name          | Type                         | Required | Restrictions | Description                                        |
-|---------------|------------------------------|----------|--------------|----------------------------------------------------|
-| `forceQuery`  | boolean                      | false    |              | append a query ('?') even if RawQuery is empty     |
-| `fragment`    | string                       | false    |              | fragment for references, without '#'               |
-| `host`        | string                       | false    |              | host or host:port (see Hostname and Port methods)  |
-| `omitHost`    | boolean                      | false    |              | do not emit empty host (authority)                 |
-| `opaque`      | string                       | false    |              | encoded opaque data                                |
-| `path`        | string                       | false    |              | path (relative paths may omit leading slash)       |
-| `rawFragment` | string                       | false    |              | encoded fragment hint (see EscapedFragment method) |
-| `rawPath`     | string                       | false    |              | encoded path hint (see EscapedPath method)         |
-| `rawQuery`    | string                       | false    |              | encoded query values, without '?'                  |
-| `scheme`      | string                       | false    |              |                                                    |
-| `user`        | [url.Userinfo](#urluserinfo) | false    |              | username and password information                  |
+| Name         | Type    | Required | Restrictions | Description                                                                                                                                                            |
+|--------------|---------|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `forceQuery` | boolean | false    |              | Forcequery indicates whether the original URL contained a query ('?') character. When set, the String method will include a trailing '?', even when RawQuery is empty. |
+| `fragment`   | string  | false    |              | fragment for references (without '#')                                                                                                                                  |
+| `host`       | string  | false    |              | "host" or "host:port" (see Hostname and Port methods)                                                                                                                  |
+| `omitHost`   | boolean | false    |              | Omithost indicates the URL has an empty host (authority). When set, the String method will not include the host when it is empty.                                      |
+| `opaque`     | string  | false    |              | encoded opaque data                                                                                                                                                    |
+| `path`       | string  | false    |              | path (relative paths may omit leading slash)                                                                                                                           |
+|`rawFragment`|string|false||Rawfragment is an optional field containing an encoded fragment hint. See the EscapedFragment method for more details.
+In general, code should call EscapedFragment instead of reading RawFragment.|
+|`rawPath`|string|false||Rawpath is an optional field containing an encoded path hint. See the EscapedPath method for more details.
+In general, code should call EscapedPath instead of reading RawPath.|
+|`rawQuery`|string|false||Rawquery contains the encoded query values, without the initial '?'. Use URL.Query to decode the query.|
+|`scheme`|string|false|||
+|`user`|[url.Userinfo](#urluserinfo)|false||username and password information|
 
 ## serpent.ValueSource
 

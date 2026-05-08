@@ -14,6 +14,7 @@ import { getChatFileURL } from "../../utils/chatAttachments";
 import { encodeInlineTextAttachment } from "../../utils/fetchTextAttachment";
 import { ConversationTimeline } from "./ConversationTimeline";
 import { parseMessagesWithMergedTools } from "./messageParsing";
+import type { ParsedMessageEntry } from "./types";
 
 // 1×1 solid coral (#FF6B6B) PNG encoded as base64.
 const TEST_PNG_B64 =
@@ -235,6 +236,13 @@ const buildStoryArgs = (...messages: TypesGen.ChatMessage[]) => ({
 	parsedMessages: buildMessages(messages),
 });
 
+const LONG_USER_MESSAGE = [
+	"This is a deliberately long user message that should stay pinned to the",
+	"right edge while the bubble stops short of filling the entire timeline",
+	"column. It gives the Storybook test enough content to exercise the",
+	"maximum width cap.",
+].join(" ");
+
 const findAttachmentTile = async (
 	canvas: ReturnType<typeof within>,
 	label: string,
@@ -290,6 +298,38 @@ const meta: Meta<typeof ConversationTimeline> = {
 };
 export default meta;
 type Story = StoryObj<typeof ConversationTimeline>;
+
+/**
+ * User bubbles should stay right-aligned, shrink to fit short content,
+ * and cap long content so the timeline keeps some breathing room.
+ */
+export const UserMessageBubbleAlignment: Story = {
+	args: buildStoryArgs(
+		buildUserMessage({
+			text: LONG_USER_MESSAGE,
+		}),
+	),
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		const messageText = canvas.getByText(/deliberately long user message/i);
+		const userRow = messageText.closest('[data-role="user"]');
+		expect(userRow).not.toBeNull();
+
+		const bubble = userRow?.firstElementChild;
+		expect(bubble).not.toBeNull();
+
+		await userEvent.hover(userRow?.parentElement as HTMLElement);
+		const actions = await canvas.findByTestId("message-actions");
+
+		const rowRect = (userRow as HTMLElement).getBoundingClientRect();
+		const bubbleRect = (bubble as HTMLElement).getBoundingClientRect();
+		const actionsRect = actions.getBoundingClientRect();
+
+		expect(bubbleRect.width).toBeLessThanOrEqual(rowRect.width * 0.81);
+		expect(Math.abs(rowRect.right - bubbleRect.right)).toBeLessThanOrEqual(2);
+		expect(Math.abs(rowRect.right - actionsRect.right)).toBeLessThanOrEqual(2);
+	},
+};
 
 /** Regression guard: a single image attachment must not be duplicated. */
 export const UserMessageWithSingleImage: Story = {
@@ -1714,6 +1754,78 @@ export const AssistantActionBarAfterHiddenMessages: Story = {
 	},
 };
 
+export const CodeDiffDisplayModeFromPreferences: Story = {
+	parameters: {
+		queries: [
+			{
+				key: ["me", "preferences"],
+				data: {
+					task_notification_alert_dismissed: false,
+					thinking_display_mode: "auto" as const,
+					code_diff_display_mode: "always_collapsed" as const,
+				},
+			},
+		],
+	},
+	args: {
+		...defaultArgs,
+		parsedMessages: [
+			{
+				message: {
+					...baseMessage,
+					id: 1,
+					role: "assistant",
+					content: [],
+				},
+				parsed: {
+					markdown: "",
+					reasoning: "",
+					toolCalls: [],
+					toolResults: [],
+					tools: [
+						{
+							id: "edit-tool",
+							name: "edit_files",
+							args: {
+								files: [
+									{
+										path: "src/config.ts",
+										edits: [
+											{
+												search: "const timeout = 30;",
+												replace: "const timeout = 60;",
+											},
+										],
+									},
+								],
+							},
+							result: { ok: true },
+							isError: false,
+							status: "completed",
+						},
+					],
+					blocks: [{ type: "tool", id: "edit-tool" }],
+					sources: [],
+				},
+			},
+		] satisfies ParsedMessageEntry[],
+	},
+	play: async ({ canvasElement }) => {
+		const canvas = within(canvasElement);
+		expect(canvas.getByText(/Edited config\.ts/)).toBeVisible();
+		expect(canvas.queryAllByTestId("edit-file-diff")).toHaveLength(0);
+
+		const editFilesButton = canvas.getByRole("button", {
+			name: /Edited config\.ts/,
+		});
+		expect(editFilesButton).toHaveAttribute("aria-expanded", "false");
+		await userEvent.click(editFilesButton);
+		await waitFor(() => {
+			expect(canvas.getAllByTestId("edit-file-diff")).toHaveLength(1);
+		});
+	},
+};
+
 /**
  * A completed thinking block with always_expanded mode should show
  * its content without user interaction.
@@ -1726,6 +1838,7 @@ export const ThinkingBlockAlwaysExpanded: Story = {
 				data: {
 					task_notification_alert_dismissed: false,
 					thinking_display_mode: "always_expanded" as const,
+					code_diff_display_mode: "auto" as const,
 				},
 			},
 		],
@@ -1773,6 +1886,7 @@ export const ThinkingBlockAlwaysCollapsed: Story = {
 				data: {
 					task_notification_alert_dismissed: false,
 					thinking_display_mode: "always_collapsed" as const,
+					code_diff_display_mode: "auto" as const,
 				},
 			},
 		],
@@ -1821,6 +1935,7 @@ export const ThinkingBlockWithToolCall: Story = {
 				data: {
 					task_notification_alert_dismissed: false,
 					thinking_display_mode: "always_collapsed" as const,
+					code_diff_display_mode: "auto" as const,
 				},
 			},
 		],
@@ -1882,6 +1997,7 @@ export const ThinkingBlockAutoMode: Story = {
 				data: {
 					task_notification_alert_dismissed: false,
 					thinking_display_mode: "auto" as const,
+					code_diff_display_mode: "auto" as const,
 				},
 			},
 		],
@@ -1933,6 +2049,7 @@ export const ThinkingBlockPreviewMode: Story = {
 				data: {
 					task_notification_alert_dismissed: false,
 					thinking_display_mode: "preview" as const,
+					code_diff_display_mode: "auto" as const,
 				},
 			},
 		],

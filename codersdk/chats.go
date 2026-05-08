@@ -33,6 +33,15 @@ const ChatCompactionThresholdKeyPrefix = "chat_compaction_threshold_pct:"
 // this limit than to lower it.
 const MaxChatFileIDs = 20
 
+// MaxChatFileSizeBytes is the upload-endpoint cap for chat
+// attachments.
+const MaxChatFileSizeBytes = 10 * 1024 * 1024
+
+// AnthropicInlineImageCapBytes is Anthropic's documented per-image
+// wire limit; the same cap applies to Bedrock-hosted Claude. Other
+// providers have no documented per-image cap.
+const AnthropicInlineImageCapBytes = 5 * 1024 * 1024
+
 // ChatAttachmentMediaType is a media type that is allowed for durable
 // chat file storage. The set is intentionally narrow; byte-level
 // classification and inline-render rules live alongside the enforcement
@@ -110,6 +119,7 @@ type Chat struct {
 	Status            ChatStatus         `json:"status"`
 	PlanMode          ChatPlanMode       `json:"plan_mode,omitempty"`
 	LastError         *ChatError         `json:"last_error,omitempty"`
+	LastTurnSummary   *string            `json:"last_turn_summary"`
 	DiffStatus        *ChatDiffStatus    `json:"diff_status,omitempty"`
 	CreatedAt         time.Time          `json:"created_at" format:"date-time"`
 	UpdatedAt         time.Time          `json:"updated_at" format:"date-time"`
@@ -761,9 +771,6 @@ type AdvisorConfig struct {
 	// resolved (e.g. the referenced model config was soft-deleted or
 	// its provider was disabled after the admin saved this config).
 	ModelConfigID uuid.UUID `json:"model_config_id" format:"uuid"`
-	// ReasoningEffort overlays provider reasoning effort on the advisor
-	// call config when supported. Allowed: "", "low", "medium", "high".
-	ReasoningEffort string `json:"reasoning_effort"`
 }
 
 // UpdateAdvisorConfigRequest is the request body for updating advisor
@@ -1594,6 +1601,7 @@ type ChatWatchEventKind string
 
 const (
 	ChatWatchEventKindStatusChange     ChatWatchEventKind = "status_change"
+	ChatWatchEventKindSummaryChange    ChatWatchEventKind = "summary_change"
 	ChatWatchEventKindTitleChange      ChatWatchEventKind = "title_change"
 	ChatWatchEventKindCreated          ChatWatchEventKind = "created"
 	ChatWatchEventKindDeleted          ChatWatchEventKind = "deleted"
@@ -1602,8 +1610,8 @@ const (
 )
 
 // ChatWatchEvent represents an event from the global chat watch stream.
-// It delivers lifecycle events (created, status change, title change)
-// for all of the authenticated user's chats. When Kind is
+// It delivers lifecycle events (created, status change, summary change,
+// title change) for all of the authenticated user's chats. When Kind is
 // ActionRequired, ToolCalls contains the pending dynamic tool
 // invocations the client must execute and submit back.
 type ChatWatchEvent struct {

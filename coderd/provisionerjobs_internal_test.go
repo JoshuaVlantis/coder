@@ -20,7 +20,6 @@ import (
 	"github.com/coder/coder/v2/coderd/database/dbtime"
 	"github.com/coder/coder/v2/coderd/database/pubsub"
 	"github.com/coder/coder/v2/coderd/httpapi"
-	"github.com/coder/coder/v2/coderd/httpmw"
 	"github.com/coder/coder/v2/coderd/httpmw/loggermw"
 	"github.com/coder/coder/v2/coderd/httpmw/loggermw/loggermock"
 	"github.com/coder/coder/v2/codersdk"
@@ -152,7 +151,7 @@ func Test_logFollower_completeBeforeFollow(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mDB := dbmock.NewMockStore(ctrl)
 	ps := pubsub.NewInMemory()
-	hbc := httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute)
+	hbc := httpapi.NewHeartbeatCloser()
 	now := dbtime.Now()
 	job := database.ProvisionerJob{
 		ID:        uuid.New(),
@@ -216,7 +215,7 @@ func Test_logFollower_completeBeforeSubscribe(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mDB := dbmock.NewMockStore(ctrl)
 	ps := pubsub.NewInMemory()
-	hbc := httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute)
+	hbc := httpapi.NewHeartbeatCloser()
 	now := dbtime.Now()
 	job := database.ProvisionerJob{
 		ID:        uuid.New(),
@@ -295,7 +294,7 @@ func Test_logFollower_EndOfLogs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mDB := dbmock.NewMockStore(ctrl)
 	ps := pubsub.NewInMemory()
-	hbc := httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute)
+	hbc := httpapi.NewHeartbeatCloser()
 	now := dbtime.Now()
 	job := database.ProvisionerJob{
 		ID:        uuid.New(),

@@ -633,7 +633,7 @@ func New(options *Options) *API {
 		dbRolluper:       options.DatabaseRolluper,
 		ProfileCollector: defaultProfileCollector{},
 		AISeatTracker:    aiseats.Noop{},
-		heartbeatCloser:  httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+		heartbeatCloser:  httpapi.NewHeartbeatCloser().WithRecording(httpmw.ExtractHTTPRoute),
 	}
 
 	api.WorkspaceAppsProvider = workspaceapps.NewDBTokenProvider(

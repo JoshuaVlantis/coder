@@ -272,9 +272,7 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx := testutil.Context(t, testutil.WaitShort)
-		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
-			return "/test/path"
-		})
+		hbc := httpapi.NewHeartbeatCloser()
 
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
@@ -302,9 +300,7 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx, cancel := context.WithCancel(testutil.Context(t, testutil.WaitShort))
-		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
-			return "/test/path"
-		})
+		hbc := httpapi.NewHeartbeatCloser()
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
 		_, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
@@ -329,9 +325,7 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx := testutil.Context(t, testutil.WaitShort)
-		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
-			return "/test/path"
-		})
+		hbc := httpapi.NewHeartbeatCloser()
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
 		_, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
@@ -362,9 +356,7 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		t.Parallel()
 
 		ctx, cancel := context.WithCancel(testutil.Context(t, testutil.WaitShort))
-		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
-			return "/test/path"
-		})
+		hbc := httpapi.NewHeartbeatCloser()
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
 		send, done, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)
@@ -406,9 +398,7 @@ func TestOneWayWebSocketEventSender(t *testing.T) {
 		timeout := hbDuration + (5 * time.Second)
 
 		ctx := testutil.Context(t, timeout)
-		hbc := httpapi.NewHeartbeatCloser(func(context.Context) string {
-			return "/test/path"
-		})
+		hbc := httpapi.NewHeartbeatCloser()
 		req := newBaseRequest(ctx)
 		writer := newOneWayWriter(t)
 		_, _, err := httpapi.OneWayWebSocketEventSender(slogtest.Make(t, nil), hbc)(writer, req)

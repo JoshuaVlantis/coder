@@ -16,41 +16,51 @@ import (
 
 const HeartbeatInterval time.Duration = 15 * time.Second
 
-type Heartbeater interface {
-	HeartbeatClose(ctx context.Context, logger slog.Logger, exit func(), conn *websocket.Conn)
-}
+const websocketHeartbeatsHelp = "Total successful WebSocket heartbeat " +
+	"pings, labeled by route. Compare " +
+	"rate(coderd_api_websocket_heartbeats_total[1m]) * 15 against " +
+	"coderd_api_concurrent_websockets to detect zombie connections or " +
+	"wedged handlers."
 
-// HeartbeatCloser periodically checks websocket connection liveness and closes it if the ping fails.
+// HeartbeatCloser periodically checks websocket connection liveness and closes
+// it if the ping fails. The zero value is safe for use.
 type HeartbeatCloser struct {
 	clk        quartz.Clock
 	heartbeats *prometheus.CounterVec
 	pathFn     func(context.Context) string
 }
 
-func NewHeartbeatCloser(pathFn func(context.Context) string, opts ...func(*HeartbeatCloser)) *HeartbeatCloser {
+// NewHeartbeatCloser creates a new HeartbeatCloser without metrics.
+func NewHeartbeatCloser() *HeartbeatCloser {
 	hbc := &HeartbeatCloser{
 		clk: quartz.NewReal(),
-		heartbeats: prometheus.NewCounterVec(prometheus.CounterOpts{
-			Namespace: "coderd",
-			Subsystem: "api",
-			Name:      "websocket_heartbeats_total",
-			Help:      "Number of websocket heartbeats by path. Compare against coderd_api_concurrent_websockets_total to detect wedged handlers.",
-		}, []string{"path"}),
-		pathFn: pathFn,
-	}
-	for _, opt := range opts {
-		opt(hbc)
 	}
 	return hbc
 }
 
-func (hc *HeartbeatCloser) inc(ctx context.Context) {
-	if hc == nil {
+// WithRecording configures successful heartbeat counting. It must be called
+// before the HeartbeatCloser is registered or used by any handlers.
+func (hc *HeartbeatCloser) WithRecording(pathFn func(context.Context) string) *HeartbeatCloser {
+	hc.pathFn = pathFn
+	hc.heartbeats = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Namespace: "coderd",
+		Subsystem: "api",
+		Name:      "websocket_heartbeats_total",
+		Help:      websocketHeartbeatsHelp,
+	}, []string{"path"})
+	return hc
+}
+
+func (hc *HeartbeatCloser) recordHeartbeat(ctx context.Context) {
+	if hc == nil || hc.heartbeats == nil {
 		return
 	}
-	path := hc.pathFn(ctx)
-	if path == "" {
-		return
+	path := "UNKNOWN"
+	if hc.pathFn != nil {
+		path = hc.pathFn(ctx)
+		if path == "" {
+			path = "UNKNOWN"
+		}
 	}
 	hc.heartbeats.WithLabelValues(path).Inc()
 }
@@ -58,16 +68,16 @@ func (hc *HeartbeatCloser) inc(ctx context.Context) {
 // HeartbeatClose loops to ping a WebSocket to keep it alive.
 // It calls `exit` on ping failure.
 func (hc *HeartbeatCloser) HeartbeatClose(ctx context.Context, logger slog.Logger, exit func(), conn *websocket.Conn) {
-	if hc == nil { // ensure nil-safety
+	if hc == nil || hc.clk == nil {
 		heartbeatCloseWith(ctx, logger, nil, exit, conn, quartz.NewReal(), HeartbeatInterval)
 		return
 	}
-	heartbeatCloseWith(ctx, logger, hc.inc, exit, conn, hc.clk, HeartbeatInterval)
+	heartbeatCloseWith(ctx, logger, hc.recordHeartbeat, exit, conn, hc.clk, HeartbeatInterval)
 }
 
 // Collect implements prometheus.Collector.
 func (hc *HeartbeatCloser) Collect(ch chan<- prometheus.Metric) {
-	if hc == nil {
+	if hc == nil || hc.heartbeats == nil {
 		return
 	}
 	hc.heartbeats.Collect(ch)
@@ -75,13 +85,13 @@ func (hc *HeartbeatCloser) Collect(ch chan<- prometheus.Metric) {
 
 // Describe implements prometheus.Collector.
 func (hc *HeartbeatCloser) Describe(ch chan<- *prometheus.Desc) {
-	if hc == nil {
+	if hc == nil || hc.heartbeats == nil {
 		return
 	}
 	hc.heartbeats.Describe(ch)
 }
 
-func heartbeatCloseWith(ctx context.Context, logger slog.Logger, countFn func(context.Context), exit func(), conn *websocket.Conn, clk quartz.Clock, interval time.Duration) {
+func heartbeatCloseWith(ctx context.Context, logger slog.Logger, recordHeartbeat func(context.Context), exit func(), conn *websocket.Conn, clk quartz.Clock, interval time.Duration) {
 	ticker := clk.NewTicker(interval, "HeartbeatClose")
 	defer ticker.Stop()
 
@@ -114,8 +124,8 @@ func heartbeatCloseWith(ctx context.Context, logger slog.Logger, countFn func(co
 			exit()
 			return
 		}
-		if countFn != nil {
-			countFn(ctx)
+		if recordHeartbeat != nil {
+			recordHeartbeat(ctx)
 		}
 	}
 }

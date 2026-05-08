@@ -133,7 +133,7 @@ func runWatchChatGitWorkspaceLookupTest(t *testing.T, workspaceErr error, wantSt
 				Authorizer: &mockAuthorizer{},
 				Logger:     logger,
 			},
-			heartbeatCloser: httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+			heartbeatCloser: httpapi.NewHeartbeatCloser(),
 		}
 	)
 
@@ -190,7 +190,7 @@ func TestWatchChatGit(t *testing.T) {
 					Logger:                         logger,
 					DeploymentValues:               &codersdk.DeploymentValues{},
 				},
-				heartbeatCloser: httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+				heartbeatCloser: httpapi.NewHeartbeatCloser(),
 			}
 		)
 
@@ -265,7 +265,7 @@ func TestWatchChatGit(t *testing.T) {
 					Logger:                         logger,
 					DeploymentValues:               &codersdk.DeploymentValues{},
 				},
-				heartbeatCloser: httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+				heartbeatCloser: httpapi.NewHeartbeatCloser(),
 			}
 		)
 
@@ -773,7 +773,7 @@ func TestWatchAgentContainers(t *testing.T) {
 					DeploymentValues:               &codersdk.DeploymentValues{},
 					TailnetCoordinator:             tailnettest.NewFakeCoordinator(),
 				},
-				heartbeatCloser: httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+				heartbeatCloser: httpapi.NewHeartbeatCloser(),
 			}
 		)
 
@@ -891,7 +891,7 @@ func TestWatchAgentContainers(t *testing.T) {
 					DeploymentValues:               &codersdk.DeploymentValues{},
 					TailnetCoordinator:             tailnettest.NewFakeCoordinator(),
 				},
-				heartbeatCloser: httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+				heartbeatCloser: httpapi.NewHeartbeatCloser(),
 			}
 		)
 

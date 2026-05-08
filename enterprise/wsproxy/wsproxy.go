@@ -213,7 +213,7 @@ func New(ctx context.Context, opts *Options) (*Server, error) {
 		}
 	})
 
-	heartbeatCloser := httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute)
+	heartbeatCloser := httpapi.NewHeartbeatCloser().WithRecording(httpmw.ExtractHTTPRoute)
 	if opts.PrometheusRegistry != nil {
 		opts.PrometheusRegistry.MustRegister(derpmetrics.NewDERPExpvarCollector(derpServer))
 		opts.PrometheusRegistry.MustRegister(heartbeatCloser)

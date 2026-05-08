@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -222,5 +223,45 @@ func TestHeartbeatClose(t *testing.T) {
 		assert.Empty(t, debugEntries,
 			"successful pings should not produce debug-level logs, got: %+v", debugEntries)
 		assert.Equal(t, 3, int(hbCalls.Load()), "expected heartbeat counter to be incremented by 3")
+	})
+
+	t.Run("RecordsPrometheusCounter", func(t *testing.T) {
+		t.Parallel()
+		ctx := testutil.Context(t, testutil.WaitShort)
+
+		registry := prometheus.NewRegistry()
+		heartbeatCloser := NewHeartbeatCloser().WithRecording(func(context.Context) string {
+			return "/test/path"
+		})
+		registry.MustRegister(heartbeatCloser)
+
+		sink := testutil.NewFakeSink(t)
+		logger := sink.Logger()
+		mClock := quartz.NewMock(t)
+
+		trap := mClock.Trap().NewTicker("HeartbeatClose")
+		defer trap.Close()
+
+		serverConn := websocketPair(ctx, t)
+		exitCalled := make(chan struct{}, 1)
+
+		go heartbeatCloseWith(ctx, logger, heartbeatCloser.recordHeartbeat, func() {
+			exitCalled <- struct{}{}
+		}, serverConn, mClock, time.Second)
+
+		trap.MustWait(ctx).MustRelease(ctx)
+		mClock.Advance(time.Second).MustWait(ctx)
+
+		testutil.Eventually(ctx, t, func(context.Context) bool {
+			select {
+			case <-exitCalled:
+				t.Fatal("exit should not be called when pings succeed")
+			default:
+			}
+			metrics, err := registry.Gather()
+			require.NoError(t, err)
+			return testutil.PromCounterHasValue(t, metrics, 1,
+				"coderd_api_websocket_heartbeats_total", "/test/path")
+		}, testutil.IntervalFast, "heartbeat counter not incremented")
 	})
 }

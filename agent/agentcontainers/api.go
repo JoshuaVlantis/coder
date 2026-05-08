@@ -33,7 +33,6 @@ import (
 	"github.com/coder/coder/v2/agent/usershell"
 	"github.com/coder/coder/v2/coderd/httpapi"
 	"github.com/coder/coder/v2/coderd/httpapi/httperror"
-	"github.com/coder/coder/v2/coderd/httpmw"
 	"github.com/coder/coder/v2/codersdk"
 	"github.com/coder/coder/v2/codersdk/agentsdk"
 	"github.com/coder/coder/v2/provisioner"
@@ -344,7 +343,7 @@ func NewAPI(logger slog.Logger, options ...Option) *API {
 		scriptLogger:                func(uuid.UUID) ScriptLogger { return noopScriptLogger{} },
 		injectedSubAgentProcs:       make(map[string]subAgentProcess),
 		usingWorkspaceFolderName:    make(map[string]bool),
-		heartbeatCloser:             httpapi.NewHeartbeatCloser(httpmw.ExtractHTTPRoute),
+		heartbeatCloser:             httpapi.NewHeartbeatCloser(),
 	}
 	// The ctx and logger must be set before applying options to avoid
 	// nil pointer dereference.

@@ -40,7 +40,7 @@ func NewHeartbeatCloser() *HeartbeatCloser {
 
 // WithMetrics configures successful heartbeat counting. It must be called
 // before the HeartbeatCloser is registered or used by any handlers. It is
-// the responsiblity of the caller to register HeartbeatCloser with a
+// the responsibility of the caller to register HeartbeatCloser with a
 // Prometheus registry.
 func (hc *HeartbeatCloser) WithMetrics(pathFn func(context.Context) string) *HeartbeatCloser {
 	hc.pathFn = pathFn

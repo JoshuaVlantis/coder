@@ -60,7 +60,7 @@ func TestHeartbeatClose(t *testing.T) {
 
 	t.Run("Nilsafe", func(t *testing.T) {
 		t.Parallel()
-		ctx := testutil.Context(t, testutil.IntervalSlow)
+		ctx, cancel := context.WithCancel(testutil.Context(t, testutil.WaitShort))
 		sink := testutil.NewFakeSink(t)
 		logger := sink.Logger()
 		serverConn := websocketPair(ctx, t)
@@ -77,6 +77,7 @@ func TestHeartbeatClose(t *testing.T) {
 			}()
 			nilHbc.HeartbeatClose(ctx, logger, func() {}, serverConn)
 		}()
+		cancel()
 		<-deferCalled
 	})
 

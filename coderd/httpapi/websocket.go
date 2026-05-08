@@ -50,6 +50,9 @@ func (hc *HeartbeatCloser) WithMetrics(pathFn func(context.Context) string) *Hea
 		Name:      "websocket_heartbeats_total",
 		Help:      websocketHeartbeatsHelp,
 	}, []string{"path"})
+	if hc.clk == nil {
+		hc.clk = quartz.NewReal()
+	}
 	return hc
 }
 

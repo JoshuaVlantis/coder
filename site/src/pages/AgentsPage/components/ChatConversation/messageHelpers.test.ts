@@ -16,9 +16,17 @@ const readFileTool = (id: string): MergedTool => ({
 	status: "completed",
 });
 
+const readFileToolResult = (toolID: string) => ({
+	id: toolID,
+	name: "read_file" as const,
+	result: { content: toolID },
+	isError: false,
+});
+
 const readFileMessage = (
 	messageID: number,
 	toolID: string,
+	parsedOverrides: Partial<ParsedMessageEntry["parsed"]> = {},
 ): ParsedMessageEntry => {
 	const args = { path: `${toolID}.ts` };
 	const tool = readFileTool(toolID);
@@ -40,10 +48,11 @@ const readFileMessage = (
 			markdown: "",
 			reasoning: "",
 			toolCalls: [{ id: toolID, name: "read_file", args }],
-			toolResults: [],
+			toolResults: [readFileToolResult(toolID)],
 			tools: [tool],
 			blocks: [{ type: "tool", id: toolID }],
 			sources: [],
+			...parsedOverrides,
 		},
 	};
 };
@@ -87,14 +96,7 @@ const hiddenToolResultMessage = (
 		markdown: "",
 		reasoning: "",
 		toolCalls: [],
-		toolResults: [
-			{
-				id: toolID,
-				name: "read_file",
-				result: { content: toolID },
-				isError: false,
-			},
-		],
+		toolResults: [readFileToolResult(toolID)],
 		tools: [readFileTool(toolID)],
 		blocks: [{ type: "tool", id: toolID }],
 		sources: [],
@@ -157,6 +159,14 @@ describe("groupSequentialReadFileMessages", () => {
 
 		expect(result).toHaveLength(1);
 		expect(result[0].message.id).toBe(1);
+		expect(result[0].parsed.toolCalls).toEqual([
+			{ id: "read-1", name: "read_file", args: { path: "read-1.ts" } },
+			{ id: "read-2", name: "read_file", args: { path: "read-2.ts" } },
+		]);
+		expect(result[0].parsed.toolResults).toEqual([
+			readFileToolResult("read-1"),
+			readFileToolResult("read-2"),
+		]);
 		expect(result[0].parsed.blocks).toEqual([
 			{ type: "tool", id: "read-1" },
 			{ type: "tool", id: "read-2" },
@@ -177,6 +187,42 @@ describe("groupSequentialReadFileMessages", () => {
 		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
 		expect(result[0].parsed.blocks).toEqual([{ type: "tool", id: "read-1" }]);
 		expect(result[2].parsed.blocks).toEqual([{ type: "tool", id: "read-2" }]);
+	});
+
+	it("does not collapse read_file messages with visible markdown", () => {
+		const result = groupSequentialReadFileMessages([
+			readFileMessage(1, "read-1"),
+			readFileMessage(2, "read-2", { markdown: "Visible markdown" }),
+			readFileMessage(3, "read-3"),
+		]);
+
+		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
+		expect(result[1].parsed.markdown).toBe("Visible markdown");
+	});
+
+	it("does not collapse read_file messages with visible reasoning", () => {
+		const result = groupSequentialReadFileMessages([
+			readFileMessage(1, "read-1"),
+			readFileMessage(2, "read-2", { reasoning: "Visible reasoning" }),
+			readFileMessage(3, "read-3"),
+		]);
+
+		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
+		expect(result[1].parsed.reasoning).toBe("Visible reasoning");
+	});
+
+	it("does not collapse read_file messages with sources", () => {
+		const sources = [
+			{ url: "https://example.com/read-2", title: "Read 2 source" },
+		];
+		const result = groupSequentialReadFileMessages([
+			readFileMessage(1, "read-1"),
+			readFileMessage(2, "read-2", { sources }),
+			readFileMessage(3, "read-3"),
+		]);
+
+		expect(result.map((entry) => entry.message.id)).toEqual([1, 2, 3]);
+		expect(result[1].parsed.sources).toEqual(sources);
 	});
 
 	it("does not collapse read_file messages across another visible tool", () => {

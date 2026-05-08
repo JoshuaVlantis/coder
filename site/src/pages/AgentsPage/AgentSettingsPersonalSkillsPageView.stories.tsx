@@ -105,6 +105,115 @@ export const EditDialogOpen: Story = {
 	},
 };
 
+export const ImportSkillMarkdownPopulatesCreateFields: Story = {
+	args: {
+		editorState: {
+			mode: "create",
+			initialValues: { name: "", description: "", body: "" },
+			existingNames: skills.map((skill) => skill.name),
+			isSubmitting: false,
+			onSubmit: fn(),
+			onClose: fn(),
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const body = within(canvasElement.ownerDocument.body);
+		const dialog = await body.findByRole("dialog");
+		const dialogCanvas = within(dialog);
+		const importInput = dialogCanvas.getByLabelText("Import from SKILL.md");
+
+		await userEvent.click(importInput);
+		await userEvent.paste(
+			"---\nname: imported-skill\ndescription: Imported guidance.\n---\n\nUse imported instructions.",
+		);
+
+		await waitFor(() => {
+			expect(dialogCanvas.getByLabelText("Name")).toHaveValue("imported-skill");
+			expect(dialogCanvas.getByLabelText("Description")).toHaveValue(
+				"Imported guidance.",
+			);
+			expect(dialogCanvas.getByLabelText("Body")).toHaveValue(
+				"Use imported instructions.",
+			);
+			expect(dialogCanvas.getByText("Imported SKILL.md")).toBeVisible();
+		});
+	},
+};
+
+export const ImportSkillMarkdownShowsParseError: Story = {
+	args: {
+		editorState: {
+			mode: "create",
+			initialValues: { name: "", description: "", body: "" },
+			existingNames: skills.map((skill) => skill.name),
+			isSubmitting: false,
+			onSubmit: fn(),
+			onClose: fn(),
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const body = within(canvasElement.ownerDocument.body);
+		const dialog = await body.findByRole("dialog");
+		const dialogCanvas = within(dialog);
+		const importInput = dialogCanvas.getByLabelText("Import from SKILL.md");
+
+		await userEvent.click(importInput);
+		await userEvent.paste("---\ndescription: Missing name\n---\nBody");
+
+		await waitFor(() => {
+			expect(dialogCanvas.getByText("Could not parse SKILL.md")).toBeVisible();
+			expect(dialogCanvas.getByText("Skill name is required.")).toBeVisible();
+			expect(dialogCanvas.getByLabelText("Name")).toHaveValue("");
+			expect(dialogCanvas.getByLabelText("Description")).toHaveValue("");
+			expect(dialogCanvas.getByLabelText("Body")).toHaveValue("");
+		});
+	},
+};
+
+export const ImportSkillMarkdownKeepsEditName: Story = {
+	args: {
+		editorState: {
+			mode: "edit",
+			initialValues: {
+				name: "review-sql",
+				description: "Review SQL changes for query and index risks.",
+				body: "Check query plans, missing indexes, and transaction boundaries.",
+			},
+			existingNames: skills.map((skill) => skill.name),
+			isLoading: false,
+			isRetrying: false,
+			isSubmitting: false,
+			onRetry: fn(),
+			onSubmit: fn(),
+			onClose: fn(),
+		},
+	},
+	play: async ({ canvasElement }) => {
+		const body = within(canvasElement.ownerDocument.body);
+		const dialog = await body.findByRole("dialog");
+		const dialogCanvas = within(dialog);
+		const importInput = dialogCanvas.getByLabelText("Import from SKILL.md");
+
+		await userEvent.click(importInput);
+		await userEvent.paste(
+			"---\nname: pasted-name\ndescription: New description.\n---\n\nNew body.",
+		);
+
+		await waitFor(() => {
+			expect(dialogCanvas.getByLabelText("Name")).toHaveValue("review-sql");
+			expect(dialogCanvas.getByLabelText("Description")).toHaveValue(
+				"New description.",
+			);
+			expect(dialogCanvas.getByLabelText("Body")).toHaveValue("New body.");
+			expect(
+				dialogCanvas.getByText(
+					"Updated description and body fields. Kept the existing name.",
+				),
+			).toBeVisible();
+		});
+	},
+};
+
 export const DeleteConfirmationOpen: Story = {
 	args: {
 		deleteState: {

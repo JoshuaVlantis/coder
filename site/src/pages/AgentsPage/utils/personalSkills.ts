@@ -101,6 +101,22 @@ export const parsePersonalSkillMarkdown = (
 	}
 };
 
+export const tryParsePersonalSkillMarkdown = (
+	content: string,
+):
+	| { ok: true; values: PersonalSkillFormValues }
+	| { ok: false; error: string } => {
+	try {
+		return { ok: true, values: parsePersonalSkillMarkdown(content) };
+	} catch (error) {
+		return {
+			ok: false,
+			error:
+				error instanceof Error ? error.message : "Unable to parse SKILL.md.",
+		};
+	}
+};
+
 const frontmatterLineValue = (value: string): string =>
 	value.replace(/\r?\n/g, " ").trim();
 

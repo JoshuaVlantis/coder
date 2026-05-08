@@ -1,5 +1,10 @@
 import { type FormikErrors, useFormik } from "formik";
-import type { FC } from "react";
+import {
+	type ChangeEvent,
+	type ClipboardEvent,
+	type FC,
+	useState,
+} from "react";
 import TextareaAutosize from "react-textarea-autosize";
 import * as Yup from "yup";
 import { Alert, AlertDescription, AlertTitle } from "#/components/Alert/Alert";
@@ -22,6 +27,7 @@ import {
 	isValidPersonalSkillName,
 	PERSONAL_SKILL_MAX_SIZE_BYTES,
 	type PersonalSkillFormValues,
+	tryParsePersonalSkillMarkdown,
 } from "../utils/personalSkills";
 
 export type PersonalSkillErrorDisplay = {
@@ -46,6 +52,15 @@ const getFieldError = (
 	touched: boolean | undefined,
 	error: string | undefined,
 ): string | undefined => (touched ? error : undefined);
+
+type ImportStatus = {
+	kind: "success" | "error";
+	title: string;
+	detail?: string;
+};
+
+const beginsWithFrontmatterDelimiter = (content: string): boolean =>
+	content.replace(/^\uFEFF/, "").startsWith("---");
 
 export const PersonalSkillEditor: FC<PersonalSkillEditorProps> = ({
 	open,
@@ -111,6 +126,67 @@ export const PersonalSkillEditor: FC<PersonalSkillEditorProps> = ({
 		},
 	});
 
+	const [importContent, setImportContent] = useState("");
+	const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
+
+	const importSkillMarkdown = (contentToImport: string) => {
+		if (!contentToImport.trim()) {
+			return;
+		}
+
+		const result = tryParsePersonalSkillMarkdown(contentToImport);
+		if (!result.ok) {
+			setImportStatus({
+				kind: "error",
+				title: "Could not parse SKILL.md",
+				detail: result.error,
+			});
+			return;
+		}
+
+		if (isCreate) {
+			void form.setValues(result.values);
+			void form.setTouched({ name: true, description: true, body: true });
+		} else {
+			void form.setValues({
+				...form.values,
+				description: result.values.description,
+				body: result.values.body,
+			});
+			void form.setTouched({ name: false, description: true, body: true });
+		}
+
+		setImportContent("");
+		setImportStatus({
+			kind: "success",
+			title: "Imported SKILL.md",
+			detail: isCreate
+				? "Updated name, description, and body fields."
+				: "Updated description and body fields. Kept the existing name.",
+		});
+	};
+
+	const handleImportContentChange = (
+		event: ChangeEvent<HTMLTextAreaElement>,
+	) => {
+		setImportContent(event.target.value);
+		setImportStatus(null);
+	};
+
+	const handleImportContentPaste = (
+		event: ClipboardEvent<HTMLTextAreaElement>,
+	) => {
+		const pastedContent = event.clipboardData.getData("text");
+		if (!beginsWithFrontmatterDelimiter(pastedContent)) {
+			return;
+		}
+
+		event.preventDefault();
+		setImportContent(pastedContent);
+		setImportStatus(null);
+		importSkillMarkdown(pastedContent);
+	};
+
 	const content = buildPersonalSkillMarkdown(form.values);
 	const sizeBytes = getPersonalSkillContentSizeBytes(content);
 	const nameError = getFieldError(form.touched.name, form.errors.name);
@@ -145,6 +221,58 @@ export const PersonalSkillEditor: FC<PersonalSkillEditorProps> = ({
 						</Alert>
 					)}
 
+					<div className="flex flex-col gap-3 rounded-md border border-border-default p-4">
+						<div className="flex flex-col gap-1">
+							<Label htmlFor="personal-skill-import">
+								Import from SKILL.md
+							</Label>
+							<p className="m-0 text-xs text-content-secondary">
+								Paste a full SKILL.md file with frontmatter to auto-fill the
+								fields below.
+							</p>
+						</div>
+						<TextareaAutosize
+							id="personal-skill-import"
+							value={importContent}
+							onChange={handleImportContentChange}
+							onPaste={handleImportContentPaste}
+							placeholder="---\nname: my-skill\ndescription: ...\n---\n\nBody..."
+							disabled={isSubmitting}
+							minRows={4}
+							maxRows={10}
+							className="w-full resize-y rounded-md border border-border bg-transparent px-3 py-2 font-mono text-sm leading-relaxed text-content-primary placeholder:text-content-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-content-link disabled:cursor-not-allowed disabled:opacity-50"
+						/>
+						{importStatus && (
+							<Alert severity={importStatus.kind}>
+								<AlertTitle>{importStatus.title}</AlertTitle>
+								{importStatus.detail && (
+									<AlertDescription>{importStatus.detail}</AlertDescription>
+								)}
+							</Alert>
+						)}
+						<div className="flex justify-end gap-2">
+							{importContent && (
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={isSubmitting}
+									onClick={() => {
+										setImportContent("");
+										setImportStatus(null);
+									}}
+								>
+									Clear
+								</Button>
+							)}
+							<Button
+								size="sm"
+								disabled={isSubmitting || !importContent.trim()}
+								onClick={() => importSkillMarkdown(importContent)}
+							>
+								Import
+							</Button>
+						</div>
+					</div>
 					<div className="flex flex-col gap-2">
 						<Label htmlFor="personal-skill-name">Name</Label>
 						<Input

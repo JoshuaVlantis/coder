@@ -5,6 +5,7 @@ import {
 	isValidPersonalSkillName,
 	PERSONAL_SKILL_MAX_SIZE_BYTES,
 	parsePersonalSkillMarkdown,
+	tryParsePersonalSkillMarkdown,
 } from "./personalSkills";
 
 describe("parsePersonalSkillMarkdown", () => {
@@ -29,6 +30,34 @@ describe("parsePersonalSkillMarkdown", () => {
 			name: "test-skill",
 			description: "Build: test",
 			body: "Body",
+		});
+	});
+});
+
+describe("tryParsePersonalSkillMarkdown", () => {
+	it("returns parsed values for valid SKILL.md content", () => {
+		expect(
+			tryParsePersonalSkillMarkdown(
+				"---\nname: test-skill\ndescription: Does a thing\n---\nBody",
+			),
+		).toEqual({
+			ok: true,
+			values: {
+				name: "test-skill",
+				description: "Does a thing",
+				body: "Body",
+			},
+		});
+	});
+
+	it("returns an error message for invalid SKILL.md content", () => {
+		expect(
+			tryParsePersonalSkillMarkdown(
+				"---\ndescription: Missing name\n---\nBody",
+			),
+		).toEqual({
+			ok: false,
+			error: "Skill name is required.",
 		});
 	});
 });

@@ -2540,7 +2540,8 @@ CREATE TABLE template_version_dlp_policies (
     allowed_applications text[],
     display_name text DEFAULT ''::text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    desktop_access boolean DEFAULT false NOT NULL
+    desktop_access boolean DEFAULT false NOT NULL,
+    clipboard_access boolean DEFAULT false NOT NULL
 );
 
 CREATE TABLE template_version_parameters (

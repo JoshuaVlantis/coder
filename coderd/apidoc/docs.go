@@ -15849,6 +15849,9 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "clipboard_access": {
+                    "type": "boolean"
+                },
                 "desktop_access": {
                     "type": "boolean"
                 },

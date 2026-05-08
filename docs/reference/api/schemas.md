@@ -3185,6 +3185,7 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
   "allowed_applications": [
     "string"
   ],
+  "clipboard_access": true,
   "desktop_access": true,
   "name": "string",
   "port_forwarding_access": true,
@@ -3198,6 +3199,7 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 | Name                     | Type            | Required | Restrictions | Description                                                                                                                                    |
 |--------------------------|-----------------|----------|--------------|------------------------------------------------------------------------------------------------------------------------------------------------|
 | `allowed_applications`   | array of string | false    |              | Allowed applications lists the `coder_app` slugs the workspace user is permitted to access. Apps whose slugs are not in this list are blocked. |
+| `clipboard_access`       | boolean         | false    |              |                                                                                                                                                |
 | `desktop_access`         | boolean         | false    |              |                                                                                                                                                |
 | `name`                   | string          | false    |              |                                                                                                                                                |
 | `port_forwarding_access` | boolean         | false    |              |                                                                                                                                                |
@@ -7329,6 +7331,7 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
               "allowed_applications": [
                 "string"
               ],
+              "clipboard_access": true,
               "desktop_access": true,
               "name": "string",
               "port_forwarding_access": true,
@@ -8691,6 +8694,7 @@ Only certain features set these fields: - FeatureManagedAgentLimit|
               "allowed_applications": [
                 "string"
               ],
+              "clipboard_access": true,
               "desktop_access": true,
               "name": "string",
               "port_forwarding_access": true,
@@ -11680,6 +11684,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
               "allowed_applications": [
                 "string"
               ],
+              "clipboard_access": true,
               "desktop_access": true,
               "name": "string",
               "port_forwarding_access": true,
@@ -11975,6 +11980,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
     "allowed_applications": [
       "string"
     ],
+    "clipboard_access": true,
     "desktop_access": true,
     "name": "string",
     "port_forwarding_access": true,
@@ -12882,6 +12888,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
             "allowed_applications": [
               "string"
             ],
+            "clipboard_access": true,
             "desktop_access": true,
             "name": "string",
             "port_forwarding_access": true,
@@ -13362,6 +13369,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
         "allowed_applications": [
           "string"
         ],
+        "clipboard_access": true,
         "desktop_access": true,
         "name": "string",
         "port_forwarding_access": true,
@@ -13722,6 +13730,7 @@ If the schedule is empty, the user will be updated to use the default schedule.|
                   "allowed_applications": [
                     "string"
                   ],
+                  "clipboard_access": true,
                   "desktop_access": true,
                   "name": "string",
                   "port_forwarding_access": true,

@@ -211,6 +211,9 @@ WHERE
     id = @id::bigint;
 
 -- name: GetChatByID :one
+WITH chats AS (
+    SELECT * FROM chats_with_effective_acl
+)
 SELECT
     *
 FROM
@@ -404,6 +407,9 @@ LIMIT
 -- archive state (NULL = all, true/false = match). The archive
 -- invariant (parent archived implies child archived) is enforced
 -- at write time, not here.
+WITH chats AS (
+    SELECT * FROM chats_with_effective_acl
+)
 SELECT
     sqlc.embed(chats),
     EXISTS (
@@ -1337,6 +1343,9 @@ WHERE gme.user_id = @user_id::uuid
   AND g.chat_spend_limit_micros IS NOT NULL;
 
 -- name: GetChatsByWorkspaceIDs :many
+WITH chats AS (
+    SELECT * FROM chats_with_effective_acl
+)
 SELECT *
 FROM chats
 WHERE archived = false

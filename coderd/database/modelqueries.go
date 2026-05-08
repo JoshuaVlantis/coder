@@ -803,6 +803,8 @@ func (q *sqlQuerier) GetAuthorizedChats(ctx context.Context, arg GetChatsParams,
 			&i.Chat.PlanMode,
 			&i.Chat.ClientType,
 			&i.Chat.LastTurnSummary,
+			&i.Chat.UserACL,
+			&i.Chat.GroupACL,
 			&i.HasUnread); err != nil {
 			return nil, err
 		}

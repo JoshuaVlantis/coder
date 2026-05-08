@@ -429,6 +429,25 @@ func chatFromAutoArchiveRow(logger slog.Logger, r database.AutoArchiveInactiveCh
 			slog.Error(err),
 		)
 	}
+
+	var userACL database.ChatACL
+	if err := userACL.Scan([]byte(r.UserACL)); err != nil {
+		logger.Warn(context.Background(), "failed to parse chat user ACL from auto-archive row",
+			slog.F("chat_id", r.ID),
+			slog.F("raw_user_acl", string(r.UserACL)),
+			slog.Error(err),
+		)
+	}
+
+	var groupACL database.ChatACL
+	if err := groupACL.Scan([]byte(r.GroupACL)); err != nil {
+		logger.Warn(context.Background(), "failed to parse chat group ACL from auto-archive row",
+			slog.F("chat_id", r.ID),
+			slog.F("raw_group_acl", string(r.GroupACL)),
+			slog.Error(err),
+		)
+	}
+
 	return database.Chat{
 		ID:                  r.ID,
 		OwnerID:             r.OwnerID,
@@ -457,6 +476,8 @@ func chatFromAutoArchiveRow(logger slog.Logger, r database.AutoArchiveInactiveCh
 		DynamicTools:        r.DynamicTools,
 		PlanMode:            r.PlanMode,
 		ClientType:          r.ClientType,
+		UserACL:             userACL,
+		GroupACL:            groupACL,
 	}
 }
 

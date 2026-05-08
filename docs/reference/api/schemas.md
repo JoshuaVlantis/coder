@@ -5647,6 +5647,10 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
         "user": {}
       }
     },
+    "template_builder": {
+      "enabled": true,
+      "registry_url": "string"
+    },
     "terms_of_service_url": "string",
     "tls": {
       "address": {
@@ -6238,6 +6242,10 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
       "user": {}
     }
   },
+  "template_builder": {
+    "enabled": true,
+    "registry_url": "string"
+  },
   "terms_of_service_url": "string",
   "tls": {
     "address": {
@@ -6351,6 +6359,7 @@ CreateWorkspaceRequest provides options for creating a new workspace. Only one o
 | `support`                                      | [codersdk.SupportConfig](#codersdksupportconfig)                                                     | false    |              |                                                                    |
 | `swagger`                                      | [codersdk.SwaggerConfig](#codersdkswaggerconfig)                                                     | false    |              |                                                                    |
 | `telemetry`                                    | [codersdk.TelemetryConfig](#codersdktelemetryconfig)                                                 | false    |              |                                                                    |
+| `template_builder`                             | [codersdk.TemplateBuilderConfig](#codersdktemplatebuilderconfig)                                     | false    |              |                                                                    |
 | `terms_of_service_url`                         | string                                                                                               | false    |              |                                                                    |
 | `tls`                                          | [codersdk.TLSConfig](#codersdktlsconfig)                                                             | false    |              |                                                                    |
 | `trace`                                        | [codersdk.TraceConfig](#codersdktraceconfig)                                                         | false    |              |                                                                    |
@@ -11814,6 +11823,22 @@ Restarts will only happen on weekdays in this list on weeks which line up with W
 | Name             | Type                                                 | Required | Restrictions | Description |
 |------------------|------------------------------------------------------|----------|--------------|-------------|
 | `[any property]` | [codersdk.TransitionStats](#codersdktransitionstats) | false    |              |             |
+
+## codersdk.TemplateBuilderConfig
+
+```json
+{
+  "enabled": true,
+  "registry_url": "string"
+}
+```
+
+### Properties
+
+| Name           | Type    | Required | Restrictions | Description |
+|----------------|---------|----------|--------------|-------------|
+| `enabled`      | boolean | false    |              |             |
+| `registry_url` | string  | false    |              |             |
 
 ## codersdk.TemplateExample
 

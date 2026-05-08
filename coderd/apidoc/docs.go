@@ -17811,6 +17811,9 @@ const docTemplate = `{
                 "telemetry": {
                     "$ref": "#/definitions/codersdk.TelemetryConfig"
                 },
+                "template_builder": {
+                    "$ref": "#/definitions/codersdk.TemplateBuilderConfig"
+                },
                 "terms_of_service_url": {
                     "type": "string"
                 },
@@ -22467,6 +22470,17 @@ const docTemplate = `{
             "type": "object",
             "additionalProperties": {
                 "$ref": "#/definitions/codersdk.TransitionStats"
+            }
+        },
+        "codersdk.TemplateBuilderConfig": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "registry_url": {
+                    "type": "string"
+                }
             }
         },
         "codersdk.TemplateExample": {

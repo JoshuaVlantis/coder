@@ -3754,6 +3754,7 @@ export interface DeploymentValues {
 	readonly hide_ai_tasks?: boolean;
 	readonly ai?: AIConfig;
 	readonly stats_collection?: StatsCollectionConfig;
+	readonly template_builder?: TemplateBuilderConfig;
 	readonly config?: string;
 	readonly write_config?: boolean;
 	/**
@@ -7573,6 +7574,12 @@ export type TemplateBuildTimeStats = Record<
 	WorkspaceTransition,
 	TransitionStats
 >;
+
+// From codersdk/deployment.go
+export interface TemplateBuilderConfig {
+	readonly enabled?: boolean;
+	readonly registry_url?: string;
+}
 
 // From codersdk/insights.go
 /**

@@ -207,8 +207,10 @@ export const PersonalSkillEditor: FC<PersonalSkillEditorProps> = ({
 					<DialogHeader>
 						<DialogTitle>{title}</DialogTitle>
 						<DialogDescription>
-							Personal skills are available to your agents and stored as
-							SKILL.md content with frontmatter.
+							Personal skills are available to your agents and stored as a
+							single SKILL.md file with frontmatter. For richer skills with
+							supporting files, add them to your repo under `.agents/skills/` or
+							load them from a workspace.
 						</DialogDescription>
 					</DialogHeader>
 

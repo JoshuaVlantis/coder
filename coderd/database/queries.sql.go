@@ -5719,6 +5719,28 @@ func (q *sqlQuerier) GetActiveChatsByAgentID(ctx context.Context, agentID uuid.U
 	return items, nil
 }
 
+const getChatACLByID = `-- name: GetChatACLByID :one
+SELECT
+    user_acl AS users,
+    group_acl AS groups
+FROM
+    chats
+WHERE
+    id = $1::uuid
+`
+
+type GetChatACLByIDRow struct {
+	Users  ChatACL `db:"users" json:"users"`
+	Groups ChatACL `db:"groups" json:"groups"`
+}
+
+func (q *sqlQuerier) GetChatACLByID(ctx context.Context, id uuid.UUID) (GetChatACLByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getChatACLByID, id)
+	var i GetChatACLByIDRow
+	err := row.Scan(&i.Users, &i.Groups)
+	return i, err
+}
+
 const getChatByID = `-- name: GetChatByID :one
 WITH chats AS (
     SELECT id, owner_id, workspace_id, title, status, worker_id, started_at, heartbeat_at, created_at, updated_at, parent_chat_id, root_chat_id, last_model_config_id, archived, last_error, mode, mcp_server_ids, labels, build_id, agent_id, pin_order, last_read_message_id, last_injected_context, dynamic_tools, organization_id, plan_mode, client_type, last_turn_summary, user_acl, group_acl FROM chats_with_effective_acl
@@ -5773,6 +5795,8 @@ const getChatByIDForUpdate = `-- name: GetChatByIDForUpdate :one
 SELECT id, owner_id, workspace_id, title, status, worker_id, started_at, heartbeat_at, created_at, updated_at, parent_chat_id, root_chat_id, last_model_config_id, archived, last_error, mode, mcp_server_ids, labels, build_id, agent_id, pin_order, last_read_message_id, last_injected_context, dynamic_tools, organization_id, plan_mode, client_type, last_turn_summary, user_acl, group_acl FROM chats WHERE id = $1::uuid FOR UPDATE
 `
 
+// Callers must use this only from owner-only or system paths. This reads
+// from raw chats, so sub-chats do not inherit root ACLs during authorization.
 func (q *sqlQuerier) GetChatByIDForUpdate(ctx context.Context, id uuid.UUID) (Chat, error) {
 	row := q.db.QueryRowContext(ctx, getChatByIDForUpdate, id)
 	var i Chat
@@ -6926,32 +6950,36 @@ FROM
     chats
 WHERE
     CASE
-        WHEN $1 :: uuid != '00000000-0000-0000-0000-000000000000'::uuid THEN chats.owner_id = $1
+        WHEN $1::boolean THEN chats.owner_id = $2::uuid
         ELSE true
     END
     AND CASE
-        WHEN $2 :: boolean IS NULL THEN true
-        ELSE chats.archived = $2 :: boolean
+        WHEN $3::boolean THEN chats.owner_id != $2::uuid
+        ELSE true
+    END
+    AND CASE
+        WHEN $4 :: boolean IS NULL THEN true
+        ELSE chats.archived = $4 :: boolean
     END
     AND CASE
         -- Cursor pagination: the last element on a page acts as the cursor.
         -- The 4-tuple matches the ORDER BY below. All columns sort DESC
         -- (pin_order is negated so lower values sort first in DESC order),
         -- which lets us use a single tuple < comparison.
-        WHEN $3 :: uuid != '00000000-0000-0000-0000-000000000000'::uuid THEN (
+        WHEN $5 :: uuid != '00000000-0000-0000-0000-000000000000'::uuid THEN (
             (CASE WHEN pin_order > 0 THEN 1 ELSE 0 END, -pin_order, updated_at, id) < (
                 SELECT
                     CASE WHEN c2.pin_order > 0 THEN 1 ELSE 0 END, -c2.pin_order, c2.updated_at, c2.id
                 FROM
                     chats c2
                 WHERE
-                    c2.id = $3
+                    c2.id = $5
             )
         )
         ELSE true
     END
     AND CASE
-        WHEN $4::jsonb IS NOT NULL THEN chats.labels @> $4::jsonb
+        WHEN $6::jsonb IS NOT NULL THEN chats.labels @> $6::jsonb
         ELSE true
     END
     -- Paginate over root chats only. Children are fetched
@@ -6970,15 +6998,17 @@ ORDER BY
     -pin_order DESC,
     updated_at DESC,
     id DESC
-OFFSET $5
+OFFSET $7
 LIMIT
     -- The chat list is unbounded and expected to grow large.
     -- Default to 50 to prevent accidental excessively large queries.
-    COALESCE(NULLIF($6 :: int, 0), 50)
+    COALESCE(NULLIF($8 :: int, 0), 50)
 `
 
 type GetChatsParams struct {
-	OwnerID     uuid.UUID             `db:"owner_id" json:"owner_id"`
+	OwnedOnly   bool                  `db:"owned_only" json:"owned_only"`
+	ViewerID    uuid.UUID             `db:"viewer_id" json:"viewer_id"`
+	SharedOnly  bool                  `db:"shared_only" json:"shared_only"`
 	Archived    sql.NullBool          `db:"archived" json:"archived"`
 	AfterID     uuid.UUID             `db:"after_id" json:"after_id"`
 	LabelFilter pqtype.NullRawMessage `db:"label_filter" json:"label_filter"`
@@ -6993,7 +7023,9 @@ type GetChatsRow struct {
 
 func (q *sqlQuerier) GetChats(ctx context.Context, arg GetChatsParams) ([]GetChatsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getChats,
-		arg.OwnerID,
+		arg.OwnedOnly,
+		arg.ViewerID,
+		arg.SharedOnly,
 		arg.Archived,
 		arg.AfterID,
 		arg.LabelFilter,
@@ -7039,6 +7071,78 @@ func (q *sqlQuerier) GetChats(ctx context.Context, arg GetChatsParams) ([]GetCha
 			&i.Chat.UserACL,
 			&i.Chat.GroupACL,
 			&i.HasUnread,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getChatsByChatFileID = `-- name: GetChatsByChatFileID :many
+WITH chats AS (
+    SELECT id, owner_id, workspace_id, title, status, worker_id, started_at, heartbeat_at, created_at, updated_at, parent_chat_id, root_chat_id, last_model_config_id, archived, last_error, mode, mcp_server_ids, labels, build_id, agent_id, pin_order, last_read_message_id, last_injected_context, dynamic_tools, organization_id, plan_mode, client_type, last_turn_summary, user_acl, group_acl FROM chats_with_effective_acl
+)
+SELECT
+    id, owner_id, workspace_id, title, status, worker_id, started_at, heartbeat_at, created_at, updated_at, parent_chat_id, root_chat_id, last_model_config_id, archived, last_error, mode, mcp_server_ids, labels, build_id, agent_id, pin_order, last_read_message_id, last_injected_context, dynamic_tools, organization_id, plan_mode, client_type, last_turn_summary, user_acl, group_acl
+FROM
+    chats
+WHERE
+    id IN (
+        SELECT chat_id
+        FROM chat_file_links
+        WHERE file_id = $1::uuid
+    )
+    -- Authorize Filter clause will be injected below in GetAuthorizedChatsByChatFileID.
+    -- @authorize_filter
+`
+
+func (q *sqlQuerier) GetChatsByChatFileID(ctx context.Context, fileID uuid.UUID) ([]Chat, error) {
+	rows, err := q.db.QueryContext(ctx, getChatsByChatFileID, fileID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Chat
+	for rows.Next() {
+		var i Chat
+		if err := rows.Scan(
+			&i.ID,
+			&i.OwnerID,
+			&i.WorkspaceID,
+			&i.Title,
+			&i.Status,
+			&i.WorkerID,
+			&i.StartedAt,
+			&i.HeartbeatAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ParentChatID,
+			&i.RootChatID,
+			&i.LastModelConfigID,
+			&i.Archived,
+			&i.LastError,
+			&i.Mode,
+			pq.Array(&i.MCPServerIDs),
+			&i.Labels,
+			&i.BuildID,
+			&i.AgentID,
+			&i.PinOrder,
+			&i.LastReadMessageID,
+			&i.LastInjectedContext,
+			&i.DynamicTools,
+			&i.OrganizationID,
+			&i.PlanMode,
+			&i.ClientType,
+			&i.LastTurnSummary,
+			&i.UserACL,
+			&i.GroupACL,
 		); err != nil {
 			return nil, err
 		}
@@ -8262,6 +8366,27 @@ WHERE
 
 func (q *sqlQuerier) UnpinChatByID(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.ExecContext(ctx, unpinChatByID, id)
+	return err
+}
+
+const updateChatACLByID = `-- name: UpdateChatACLByID :exec
+UPDATE
+    chats
+SET
+    user_acl = $1,
+    group_acl = $2
+WHERE
+    id = $3::uuid
+`
+
+type UpdateChatACLByIDParams struct {
+	UserACL  ChatACL   `db:"user_acl" json:"user_acl"`
+	GroupACL ChatACL   `db:"group_acl" json:"group_acl"`
+	ID       uuid.UUID `db:"id" json:"id"`
+}
+
+func (q *sqlQuerier) UpdateChatACLByID(ctx context.Context, arg UpdateChatACLByIDParams) error {
+	_, err := q.db.ExecContext(ctx, updateChatACLByID, arg.UserACL, arg.GroupACL, arg.ID)
 	return err
 }
 

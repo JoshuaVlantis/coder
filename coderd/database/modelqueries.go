@@ -744,9 +744,14 @@ func (q *sqlQuerier) CountAuthorizedConnectionLogs(ctx context.Context, arg Coun
 
 type chatQuerier interface {
 	GetAuthorizedChats(ctx context.Context, arg GetChatsParams, prepared rbac.PreparedAuthorized) ([]GetChatsRow, error)
+	GetAuthorizedChatsByChatFileID(ctx context.Context, fileID uuid.UUID, prepared rbac.PreparedAuthorized) ([]Chat, error)
 }
 
 func (q *sqlQuerier) GetAuthorizedChats(ctx context.Context, arg GetChatsParams, prepared rbac.PreparedAuthorized) ([]GetChatsRow, error) {
+	if arg.OwnedOnly && arg.SharedOnly {
+		return nil, xerrors.New("owned_only and shared_only cannot both be true")
+	}
+
 	authorizedFilter, err := prepared.CompileToSQL(ctx, rbac.ConfigChats())
 	if err != nil {
 		return nil, xerrors.Errorf("compile authorized filter: %w", err)
@@ -760,7 +765,9 @@ func (q *sqlQuerier) GetAuthorizedChats(ctx context.Context, arg GetChatsParams,
 	// The name comment is for metric tracking
 	query := fmt.Sprintf("-- name: GetAuthorizedChats :many\n%s", filtered)
 	rows, err := q.db.QueryContext(ctx, query,
-		arg.OwnerID,
+		arg.OwnedOnly,
+		arg.ViewerID,
+		arg.SharedOnly,
 		arg.Archived,
 		arg.AfterID,
 		arg.LabelFilter,
@@ -814,6 +821,25 @@ func (q *sqlQuerier) GetAuthorizedChats(ctx context.Context, arg GetChatsParams,
 		return nil, err
 	}
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+func (q *sqlQuerier) GetAuthorizedChatsByChatFileID(ctx context.Context, fileID uuid.UUID, prepared rbac.PreparedAuthorized) ([]Chat, error) {
+	authorizedFilter, err := prepared.CompileToSQL(ctx, rbac.ConfigChats())
+	if err != nil {
+		return nil, xerrors.Errorf("compile authorized filter: %w", err)
+	}
+
+	filtered, err := insertAuthorizedFilter(getChatsByChatFileID, fmt.Sprintf(" AND %s\nLIMIT 1", authorizedFilter))
+	if err != nil {
+		return nil, xerrors.Errorf("insert authorized filter: %w", err)
+	}
+
+	query := fmt.Sprintf("-- name: GetAuthorizedChatsByChatFileID :many\n%s", filtered)
+	var items []Chat
+	if err := q.db.SelectContext(ctx, &items, query, fileID); err != nil {
 		return nil, err
 	}
 	return items, nil

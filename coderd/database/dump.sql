@@ -223,7 +223,8 @@ CREATE TYPE api_key_scope AS ENUM (
     'chat:*',
     'ai_seat:*',
     'ai_seat:create',
-    'ai_seat:read'
+    'ai_seat:read',
+    'chat:share'
 );
 
 CREATE TYPE app_sharing_level AS ENUM (

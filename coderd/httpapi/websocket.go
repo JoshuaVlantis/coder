@@ -38,9 +38,11 @@ func NewHeartbeatCloser() *HeartbeatCloser {
 	return hbc
 }
 
-// WithRecording configures successful heartbeat counting. It must be called
-// before the HeartbeatCloser is registered or used by any handlers.
-func (hc *HeartbeatCloser) WithRecording(pathFn func(context.Context) string) *HeartbeatCloser {
+// WithMetrics configures successful heartbeat counting. It must be called
+// before the HeartbeatCloser is registered or used by any handlers. It is
+// the responsiblity of the caller to register HeartbeatCloser with a
+// Prometheus registry.
+func (hc *HeartbeatCloser) WithMetrics(pathFn func(context.Context) string) *HeartbeatCloser {
 	hc.pathFn = pathFn
 	hc.heartbeats = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "coderd",
@@ -57,9 +59,8 @@ func (hc *HeartbeatCloser) recordHeartbeat(ctx context.Context) {
 	}
 	path := "UNKNOWN"
 	if hc.pathFn != nil {
-		path = hc.pathFn(ctx)
-		if path == "" {
-			path = "UNKNOWN"
+		if rp := hc.pathFn(ctx); rp != "" {
+			path = rp
 		}
 	}
 	hc.heartbeats.WithLabelValues(path).Inc()

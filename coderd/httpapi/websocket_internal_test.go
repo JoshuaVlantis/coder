@@ -40,14 +40,14 @@ func websocketPair(ctx context.Context, t *testing.T) *websocket.Conn {
 	//nolint:bodyclose
 	clientConn, _, err := websocket.Dial(ctx, srv.URL, nil)
 	require.NoError(t, err)
-	_ = clientConn.CloseRead(ctx) // needed for pings to pong
+	_ = clientConn.CloseRead(ctx) // Needed to handle pings/pongs.
 	t.Cleanup(func() {
 		_ = clientConn.Close(websocket.StatusNormalClosure, "test cleanup")
 	})
 
 	select {
 	case sc := <-serverConnCh:
-		_ = sc.CloseRead(ctx) // needed for pongs to ping
+		_ = sc.CloseRead(ctx) // Needed to handle pings/pongs.
 		return sc
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for server websocket accept")
@@ -65,7 +65,7 @@ func TestHeartbeatClose(t *testing.T) {
 		logger := sink.Logger()
 		serverConn := websocketPair(ctx, t)
 
-		var nilHbcloser *HeartbeatCloser
+		var nilHbc *HeartbeatCloser
 
 		deferCalled := make(chan struct{})
 		go func() {
@@ -75,7 +75,7 @@ func TestHeartbeatClose(t *testing.T) {
 				}
 				close(deferCalled)
 			}()
-			nilHbcloser.HeartbeatClose(ctx, logger, func() {}, serverConn)
+			nilHbc.HeartbeatClose(ctx, logger, func() {}, serverConn)
 		}()
 		<-deferCalled
 	})
@@ -172,7 +172,7 @@ func TestHeartbeatClose(t *testing.T) {
 		errorEntries := sink.Entries(func(e slog.SinkEntry) bool { return e.Level == slog.LevelError })
 		assert.Empty(t, errorEntries,
 			"context cancellation should not produce error-level logs, got: %+v", errorEntries)
-		assert.Zero(t, hbCalls.Load(), "expected no heartbeat attempts")
+		assert.Zero(t, hbCalls.Load(), "expected no successful heartbeats")
 	})
 
 	t.Run("PingSucceeds", func(t *testing.T) {
@@ -230,7 +230,7 @@ func TestHeartbeatClose(t *testing.T) {
 		ctx := testutil.Context(t, testutil.WaitShort)
 
 		registry := prometheus.NewRegistry()
-		heartbeatCloser := NewHeartbeatCloser().WithRecording(func(context.Context) string {
+		heartbeatCloser := NewHeartbeatCloser().WithMetrics(func(context.Context) string {
 			return "/test/path"
 		})
 		registry.MustRegister(heartbeatCloser)

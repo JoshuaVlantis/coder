@@ -16,6 +16,8 @@ interface ToolCollapsibleProps {
 	header: ToolCollapsibleHeader;
 	hasContent?: boolean;
 	defaultExpanded?: boolean;
+	expanded?: boolean;
+	onExpandedChange?: (expanded: boolean) => void;
 	className?: string;
 	headerClassName?: string;
 }
@@ -44,19 +46,29 @@ export const ToolCollapsible: FC<ToolCollapsibleProps> = ({
 	header,
 	hasContent = true,
 	defaultExpanded = false,
+	expanded,
+	onExpandedChange,
 	className,
 	headerClassName,
 }) => {
-	const [expanded, setExpanded] = useState(defaultExpanded);
+	const [uncontrolledExpanded, setUncontrolledExpanded] =
+		useState(defaultExpanded);
+	const isExpanded = expanded ?? uncontrolledExpanded;
+	const setExpanded = (nextExpanded: boolean) => {
+		onExpandedChange?.(nextExpanded);
+		if (expanded === undefined) {
+			setUncontrolledExpanded(nextExpanded);
+		}
+	};
 	const renderedHeader =
-		typeof header === "function" ? header(expanded) : header;
+		typeof header === "function" ? header(isExpanded) : header;
 	return (
 		<div className={className}>
 			{hasContent ? (
 				<button
 					type="button"
-					aria-expanded={expanded}
-					onClick={() => setExpanded(!expanded)}
+					aria-expanded={isExpanded}
+					onClick={() => setExpanded(!isExpanded)}
 					className={cn(
 						"border-0 bg-transparent p-0 m-0 font-[inherit] text-[inherit] text-left",
 						"flex w-full items-center gap-2 cursor-pointer",
@@ -68,7 +80,7 @@ export const ToolCollapsible: FC<ToolCollapsibleProps> = ({
 					<ChevronDownIcon
 						className={cn(
 							"h-3 w-3 shrink-0 text-current transition-transform",
-							expanded ? "rotate-0" : "-rotate-90",
+							isExpanded ? "rotate-0" : "-rotate-90",
 						)}
 					/>
 				</button>
@@ -82,7 +94,7 @@ export const ToolCollapsible: FC<ToolCollapsibleProps> = ({
 					{renderedHeader}
 				</div>
 			)}
-			{expanded && hasContent && children}
+			{isExpanded && hasContent && children}
 		</div>
 	);
 };

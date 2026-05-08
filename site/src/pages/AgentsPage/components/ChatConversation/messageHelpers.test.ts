@@ -138,6 +138,15 @@ const executeMessage = (messageID: number): ParsedMessageEntry => {
 };
 
 describe("groupSequentialReadFileMessages", () => {
+	it("returns a single read_file-only message unchanged", () => {
+		const entry = readFileMessage(1, "read-1");
+
+		const result = groupSequentialReadFileMessages([entry]);
+
+		expect(result).toHaveLength(1);
+		expect(result[0]).toBe(entry);
+	});
+
 	it("collapses read_file-only assistant messages across hidden tool results", () => {
 		const result = groupSequentialReadFileMessages([
 			readFileMessage(1, "read-1"),

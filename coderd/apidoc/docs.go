@@ -22475,7 +22475,7 @@ const docTemplate = `{
         "codersdk.TemplateBuilderConfig": {
             "type": "object",
             "properties": {
-                "enabled": {
+                "disabled": {
                     "type": "boolean"
                 },
                 "registry_url": {

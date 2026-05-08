@@ -7,7 +7,11 @@ import {
 } from "react";
 import { type InfiniteData, useQueryClient } from "react-query";
 import { watchChat } from "#/api/api";
-import { chatMessagesKey, updateInfiniteChatsCache } from "#/api/queries/chats";
+import {
+	chatMessagesKey,
+	chatPromptsKey,
+	updateInfiniteChatsCache,
+} from "#/api/queries/chats";
 import type * as TypesGen from "#/api/typesGenerated";
 import type { OneWayMessageEvent } from "#/utils/OneWayWebSocket";
 import { createReconnectingWebSocket } from "#/utils/reconnectingWebSocket";
@@ -168,6 +172,19 @@ export const useChatStore = (
 					],
 				};
 			});
+			// If any of the upserted messages is a brand-new user
+			// prompt, invalidate the dedicated prompt-history query
+			// so the composer's up/down arrow cycle picks it up on
+			// the next idle refetch. Existing IDs are skipped because
+			// edits flow through the editChatMessage mutation, which
+			// already invalidates the cache.
+			const hasNewUserPrompt = messages.some((msg) => msg.role === "user");
+			if (hasNewUserPrompt) {
+				void queryClient.invalidateQueries({
+					queryKey: chatPromptsKey(chatID),
+					exact: true,
+				});
+			}
 		},
 		[chatID, queryClient],
 	);

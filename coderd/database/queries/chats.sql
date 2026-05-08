@@ -277,6 +277,34 @@ ORDER BY
 LIMIT
     COALESCE(NULLIF(@limit_val::int, 0), 50);
 
+-- name: GetChatUserPromptsByChatID :many
+-- Returns the concatenated text of each user-visible user prompt in a
+-- chat, newest first. Used by the composer to populate the up/down
+-- arrow prompt-history cycle. Non-text parts (tool calls, files,
+-- attachments, ...) are excluded; messages whose text payload is
+-- entirely whitespace are dropped so cycling never lands on a blank
+-- entry. Backed by idx_chat_messages_user_prompts.
+SELECT
+    cm.id,
+    string_agg(part->>'text', '' ORDER BY ordinality)::text AS text
+FROM
+    chat_messages cm,
+    jsonb_array_elements(cm.content) WITH ORDINALITY AS t(part, ordinality)
+WHERE
+    cm.chat_id = @chat_id::uuid
+    AND cm.role = 'user'
+    AND cm.deleted = false
+    AND cm.visibility IN ('user', 'both')
+    AND part->>'type' = 'text'
+GROUP BY
+    cm.id
+HAVING
+    string_agg(part->>'text', '') ~ '\S'
+ORDER BY
+    cm.id DESC
+LIMIT
+    COALESCE(NULLIF(@limit_val::int, 0), 500);
+
 -- name: GetChatMessagesForPromptByChatID :many
 WITH latest_compressed_summary AS (
     SELECT

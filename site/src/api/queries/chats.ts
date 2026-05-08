@@ -20,6 +20,8 @@ export const chatsKey = ["chats"] as const;
 export const chatKey = (chatId: string) => ["chats", chatId] as const;
 export const chatMessagesKey = (chatId: string) =>
 	["chats", chatId, "messages"] as const;
+export const chatPromptsKey = (chatId: string) =>
+	["chats", chatId, "prompts"] as const;
 
 export const chatsByWorkspaceKeyPrefix = [...chatsKey, "by-workspace"] as const;
 
@@ -558,6 +560,30 @@ export const chatMessagesForInfiniteScroll = (chatId: string) => ({
 		// Use its ID as the cursor for the next (older) page.
 		return lastPage.messages[lastPage.messages.length - 1].id;
 	},
+});
+
+// PROMPT_HISTORY_LIMIT caps how many user prompts the composer asks
+// the server to return for the up/down arrow history cycle. The
+// server enforces a maximum of 2000; we ask for less so the response
+// stays small and fast for the common case while still covering
+// long-lived chats.
+const PROMPT_HISTORY_LIMIT = 500;
+
+// Treat the prompts list as fresh for 30 seconds after a fetch. The
+// composer's cycleHistorySnapshotRef takes a stable snapshot the
+// moment cycling starts, so brief staleness while a new turn lands
+// is harmless: the user's currently-cycling indices stay anchored
+// even if a refetch arrives mid-cycle. After the user stops cycling
+// the next mutation (send/edit) invalidates the key and the next
+// useQuery consumer triggers a refetch.
+const PROMPTS_STALE_MS = 30_000;
+
+export const chatPromptsQuery = (chatId: string) => ({
+	queryKey: chatPromptsKey(chatId),
+	queryFn: () =>
+		API.experimental.getChatPrompts(chatId, { limit: PROMPT_HISTORY_LIMIT }),
+	staleTime: PROMPTS_STALE_MS,
+	enabled: chatId !== "",
 });
 
 export const archiveChat = (queryClient: QueryClient) => ({
@@ -1149,6 +1175,16 @@ export const createChatMessage = (
 		API.experimental.createChatMessage(chatId, req),
 	onSuccess: () => {
 		void invalidateChatDebugRuns(queryClient, chatId);
+		// The composer's prompt-history cycle reads from a dedicated
+		// query that lists user prompts newest first. A successful
+		// send adds (or queues) a new prompt, so refresh the cache
+		// in the background. The composer's cycleHistorySnapshotRef
+		// anchors the in-flight cycle so a refetch can't shift the
+		// indexed prompt out from under the user.
+		void queryClient.invalidateQueries({
+			queryKey: chatPromptsKey(chatId),
+			exact: true,
+		});
 	},
 });
 
@@ -1236,6 +1272,14 @@ export const editChatMessage = (queryClient: QueryClient, chatId: string) => ({
 		// truncation.
 		void queryClient.invalidateQueries({
 			queryKey: chatKey(chatId),
+			exact: true,
+		});
+		// Edits replace a user prompt with a new one (different
+		// id) and truncate trailing messages, so the prompts list
+		// is no longer a faithful description of the chat. Refresh
+		// the dedicated history-cycle query in the background.
+		void queryClient.invalidateQueries({
+			queryKey: chatPromptsKey(chatId),
 			exact: true,
 		});
 		void invalidateChatDebugRuns(queryClient, chatId);

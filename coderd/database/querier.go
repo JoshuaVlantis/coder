@@ -377,6 +377,13 @@ type sqlcQuerier interface {
 	GetChatUsageLimitConfig(ctx context.Context) (ChatUsageLimitConfig, error)
 	GetChatUsageLimitGroupOverride(ctx context.Context, groupID uuid.UUID) (GetChatUsageLimitGroupOverrideRow, error)
 	GetChatUsageLimitUserOverride(ctx context.Context, userID uuid.UUID) (GetChatUsageLimitUserOverrideRow, error)
+	// Returns the concatenated text of each user-visible user prompt in a
+	// chat, newest first. Used by the composer to populate the up/down
+	// arrow prompt-history cycle. Non-text parts (tool calls, files,
+	// attachments, ...) are excluded; messages whose text payload is
+	// entirely whitespace are dropped so cycling never lands on a blank
+	// entry. Backed by idx_chat_messages_user_prompts.
+	GetChatUserPromptsByChatID(ctx context.Context, arg GetChatUserPromptsByChatIDParams) ([]GetChatUserPromptsByChatIDRow, error)
 	// Returns the global TTL for chat workspaces as a Go duration string.
 	// Returns "0s" (disabled) when no value has been configured.
 	GetChatWorkspaceTTL(ctx context.Context) (string, error)

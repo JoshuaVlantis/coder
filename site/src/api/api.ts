@@ -3135,6 +3135,24 @@ class ExperimentalApiMethods {
 		return response.data;
 	};
 
+	/**
+	 * Lists the user-authored prompts in a chat, newest first.
+	 * Powers the composer's up/down arrow prompt-history cycle.
+	 */
+	getChatPrompts = async (
+		chatId: string,
+		opts?: { limit?: number },
+	): Promise<TypesGen.ChatPromptsResponse> => {
+		const params = new URLSearchParams();
+		if (opts?.limit) {
+			params.set("limit", opts.limit.toString());
+		}
+		const query = params.toString();
+		const url = `/api/experimental/chats/${chatId}/prompts${query ? `?${query}` : ""}`;
+		const response = await this.axios.get<TypesGen.ChatPromptsResponse>(url);
+		return response.data;
+	};
+
 	createChat = async (
 		req: TypesGen.CreateChatRequest,
 	): Promise<TypesGen.Chat> => {
